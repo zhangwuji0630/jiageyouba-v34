@@ -1,0 +1,52 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: max(884px, 100dvh);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.toggle-pill {
+  transition: all 180ms ease;
+}
+
+.toggle-pill--active {
+  background: #cafd00;
+  color: #516700;
+}
+
+.toggle-pill--inactive {
+  color: #adaaaa;
+}
+
+.fuel-option {
+  transition: all 180ms ease;
+}
+
+.fuel-option--active {
+  background: #cafd00;
+  color: #516700;
+  box-shadow: 0 0 20px rgba(202, 253, 0, 0.2);
+}
+
+.fuel-option--inactive {
+  background: #262626;
+  color: #ffffff;
+  border: 1px solid transparent;
+}

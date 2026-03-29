@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html class="dark" lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+  <meta content="#0e0e0e" name="theme-color"/>
+  <meta content="yes" name="apple-mobile-web-app-capable"/>
+  <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
+  <meta content="加油记录" name="apple-mobile-web-app-title"/>
+  <title>记录 - 加油记录 V3.4</title>
+  <link href="./manifest.webmanifest" rel="manifest"/>
+  <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
+  <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
+  <link href="./app.css" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@100;300;400;700&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-variant": "#262626",
+              "error": "#ff7351",
+              "on-secondary-container": "#f0dcff",
+              "error-container": "#b92902",
+              "outline": "#767575",
+              "error-dim": "#d53d18",
+              "primary-dim": "#beee00",
+              "on-secondary-fixed-variant": "#7500cc",
+              "surface-container-high": "#20201f",
+              "primary-fixed": "#cafd00",
+              "on-tertiary-container": "#5d5000",
+              "secondary": "#bf81ff",
+              "surface-container-low": "#131313",
+              "surface-container": "#1a1a1a",
+              "inverse-on-surface": "#565555",
+              "on-secondary": "#32005c",
+              "secondary-fixed": "#e4c6ff",
+              "on-primary-fixed": "#3a4a00",
+              "on-error-container": "#ffd2c8",
+              "secondary-fixed-dim": "#dab4ff",
+              "on-error": "#450900",
+              "on-primary-container": "#4a5e00",
+              "surface-tint": "#f3ffca",
+              "inverse-surface": "#fcf9f8",
+              "on-surface-variant": "#adaaaa",
+              "on-primary-fixed-variant": "#526900",
+              "primary-container": "#cafd00",
+              "surface-dim": "#0e0e0e",
+              "on-secondary-fixed": "#4e008a",
+              "on-background": "#ffffff",
+              "tertiary-dim": "#edd13a",
+              "surface-bright": "#2c2c2c",
+              "primary": "#f3ffca",
+              "tertiary-fixed-dim": "#edd13a",
+              "on-tertiary-fixed": "#483d00",
+              "surface": "#0e0e0e",
+              "inverse-primary": "#516700",
+              "on-tertiary": "#665800",
+              "tertiary-fixed": "#fce047",
+              "secondary-container": "#7701d0",
+              "on-tertiary-fixed-variant": "#685900",
+              "background": "#0e0e0e",
+              "tertiary-container": "#fce047",
+              "tertiary": "#ffeea5",
+              "surface-container-lowest": "#000000",
+              "secondary-dim": "#9c42f4",
+              "surface-container-highest": "#262626",
+              "on-surface": "#ffffff",
+              "on-primary": "#516700",
+              "primary-fixed-dim": "#beee00",
+              "outline-variant": "#484847"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+  <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #0e0e0e;
+            color: #ffffff;
+            -webkit-font-smoothing: antialiased;
+        }
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="add">
+  <header class="fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e] flat no-shadows">
+    <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-[#cafd00]" data-icon="add_circle">add_circle</span>
+        <h1 class="font-['Manrope'] font-bold text-white text-xl" id="addPageTitle">记录</h1>
+      </div>
+      <button class="hover:opacity-80 transition-opacity active:scale-95 duration-200" id="addThemeHint" type="button">
+        <span class="material-symbols-outlined text-[#adaaaa]" data-icon="dark_mode">dark_mode</span>
+      </button>
+    </div>
+  </header>
+  <main class="pt-24 pb-32 px-6 max-w-md mx-auto min-h-screen">
+    <div class="mb-12">
+      <p class="font-label text-on-surface-variant text-[0.75rem] font-bold tracking-widest uppercase mb-2">ADD NEW ENTRY</p>
+      <h2 class="font-headline text-4xl font-extrabold tracking-tight" id="addPageHeading">记录本次旅程</h2>
+    </div>
+    <form class="space-y-8" id="recordForm">
+      <div class="space-y-6">
+        <div class="bg-surface-container rounded-lg p-7 space-y-8">
+          <div class="flex items-center justify-between border-b border-outline-variant/10 pb-4">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-on-surface-variant" data-icon="calendar_today">calendar_today</span>
+              <span class="font-body text-on-surface-variant text-sm">加油日期</span>
+            </div>
+            <input class="bg-transparent border-none text-right font-headline font-bold text-on-surface focus:ring-0 p-0" id="recordDate" type="date" value="2024-05-20"/>
+          </div>
+          <div class="space-y-2">
+            <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordOdometer">当前里程 (KM)</label>
+            <input class="w-full bg-transparent border-none p-0 font-headline text-5xl font-bold text-on-surface placeholder:text-surface-variant focus:ring-0" id="recordOdometer" placeholder="000000" type="number"/>
+          </div>
+          <div class="grid grid-cols-2 gap-8 pt-4">
+            <div class="space-y-2">
+              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordTotalCost">总花费 (CNY)</label>
+              <input class="w-full bg-transparent border-none p-0 font-headline text-3xl font-bold text-primary-fixed placeholder:text-surface-variant focus:ring-0" id="recordTotalCost" placeholder="0.00" step="0.01" type="number"/>
+            </div>
+            <div class="space-y-2">
+              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordLiters">加油量 (L)</label>
+              <input class="w-full bg-transparent border-none p-0 font-headline text-3xl font-bold text-on-surface placeholder:text-surface-variant focus:ring-0" id="recordLiters" placeholder="0.00" step="0.01" type="number"/>
+            </div>
+          </div>
+          <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
+            <span class="text-on-surface-variant text-sm font-light">推算单价</span>
+            <div class="flex items-baseline gap-1">
+              <span class="font-headline font-bold text-on-surface" id="recordUnitPriceDisplay">0.00</span>
+              <span class="text-[10px] text-on-surface-variant font-bold uppercase">CNY / L</span>
+            </div>
+          </div>
+        </div>
+        <div class="bg-surface-container rounded-lg p-7 space-y-8">
+          <div class="space-y-4">
+            <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block">油品标号</label>
+            <div class="flex gap-3" data-fuel-options>
+              <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-fuel-type="92#" type="button">92#</button>
+              <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--active" data-fuel-type="95#" type="button">95#</button>
+              <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-fuel-type="98#" type="button">98#</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <p class="font-headline font-bold text-on-surface">是否加满</p>
+              <p class="text-on-surface-variant text-xs font-light">精准计算油耗数据</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input checked="" class="sr-only peer" id="recordFullTank" type="checkbox"/>
+              <div class="w-14 h-8 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-fixed"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="pt-4">
+        <button class="w-full bg-primary-fixed text-on-primary-fixed font-headline font-extrabold text-lg py-5 rounded-xl shadow-[0_24px_48px_rgba(0,0,0,0.4)] hover:opacity-90 active:scale-95 transition-all" type="submit">
+          保存记录
+        </button>
+      </div>
+    </form>
+    <div class="mt-16 text-center space-y-2 opacity-40">
+      <span class="material-symbols-outlined text-primary-fixed text-xl" data-icon="auto_awesome">auto_awesome</span>
+      <p class="font-body text-sm text-on-surface-variant italic">加满油，向自由出发</p>
+    </div>
+  </main>
+  <nav class="fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)] no-border tonal-shift">
+    <div class="flex justify-around items-center h-20 px-4 pb-safe w-full">
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
+        <span class="material-symbols-outlined" data-icon="speed">speed</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">看板</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
+        <span class="material-symbols-outlined" data-icon="add_circle" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">记录</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
+        <span class="material-symbols-outlined" data-icon="insights">insights</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">趋势</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
+        <span class="material-symbols-outlined" data-icon="history">history</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">历史</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
+        <span class="material-symbols-outlined" data-icon="settings">settings</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">设置</span>
+      </a>
+    </div>
+  </nav>
+  <script defer src="./app.js"></script>
+</body>
+</html>

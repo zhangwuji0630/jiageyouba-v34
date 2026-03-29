@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="dark" lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
+  <meta content="#0e0e0e" name="theme-color"/>
+  <meta content="yes" name="apple-mobile-web-app-capable"/>
+  <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
+  <meta content="加油记录" name="apple-mobile-web-app-title"/>
+  <title>趋势 - 加油记录 V3.4</title>
+  <link href="./manifest.webmanifest" rel="manifest"/>
+  <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
+  <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
+  <link href="./app.css" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@100;300;400;700&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-variant": "#262626",
+              "error": "#ff7351",
+              "on-secondary-container": "#f0dcff",
+              "error-container": "#b92902",
+              "outline": "#767575",
+              "error-dim": "#d53d18",
+              "primary-dim": "#beee00",
+              "on-secondary-fixed-variant": "#7500cc",
+              "surface-container-high": "#20201f",
+              "primary-fixed": "#cafd00",
+              "on-tertiary-container": "#5d5000",
+              "secondary": "#bf81ff",
+              "surface-container-low": "#131313",
+              "surface-container": "#1a1a1a",
+              "inverse-on-surface": "#565555",
+              "on-secondary": "#32005c",
+              "secondary-fixed": "#e4c6ff",
+              "on-primary-fixed": "#3a4a00",
+              "on-error-container": "#ffd2c8",
+              "secondary-fixed-dim": "#dab4ff",
+              "on-error": "#450900",
+              "on-primary-container": "#4a5e00",
+              "surface-tint": "#f3ffca",
+              "inverse-surface": "#fcf9f8",
+              "on-surface-variant": "#adaaaa",
+              "on-primary-fixed-variant": "#526900",
+              "primary-container": "#cafd00",
+              "surface-dim": "#0e0e0e",
+              "on-secondary-fixed": "#4e008a",
+              "on-background": "#ffffff",
+              "tertiary-dim": "#edd13a",
+              "surface-bright": "#2c2c2c",
+              "primary": "#f3ffca",
+              "tertiary-fixed-dim": "#edd13a",
+              "on-tertiary-fixed": "#483d00",
+              "surface": "#0e0e0e",
+              "inverse-primary": "#516700",
+              "on-tertiary": "#665800",
+              "tertiary-fixed": "#fce047",
+              "secondary-container": "#7701d0",
+              "on-tertiary-fixed-variant": "#685900",
+              "background": "#0e0e0e",
+              "tertiary-container": "#fce047",
+              "tertiary": "#ffeea5",
+              "surface-container-lowest": "#000000",
+              "secondary-dim": "#9c42f4",
+              "surface-container-highest": "#262626",
+              "on-surface": "#ffffff",
+              "on-primary": "#516700",
+              "primary-fixed-dim": "#beee00",
+              "outline-variant": "#484847"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+  <style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        background-color: #0e0e0e;
+        color: #ffffff;
+      }
+      .glass-card {
+        background: rgba(26, 26, 26, 0.6);
+        backdrop-filter: blur(20px);
+      }
+    </style>
+</head>
+<body class="font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="stats">
+  <header class="fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e]">
+    <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-[#cafd00]" data-icon="insights">insights</span>
+        <h1 class="font-['Manrope'] font-bold text-white text-xl">趋势</h1>
+      </div>
+      <button class="hover:opacity-80 transition-opacity active:scale-95 duration-200" id="statsThemeHint" type="button">
+        <span class="material-symbols-outlined text-[#adaaaa]" data-icon="dark_mode">dark_mode</span>
+      </button>
+    </div>
+  </header>
+  <main class="pt-24 pb-32 px-6 max-w-md mx-auto min-h-screen">
+    <section class="mb-12">
+      <p class="font-label text-on-surface-variant text-[0.75rem] font-bold uppercase tracking-widest mb-2">本月支出总额</p>
+      <div class="flex items-baseline gap-1">
+        <span class="text-on-surface-variant text-2xl font-light">¥</span>
+        <h2 class="font-headline text-[3.5rem] font-bold leading-none tracking-tight" id="statsMonthlySpend">4280.50</h2>
+      </div>
+    </section>
+    <div class="grid grid-cols-2 gap-4 mb-8">
+      <div class="col-span-2 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden">
+        <div class="relative w-48 h-48 flex items-center justify-center">
+          <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" fill="transparent" r="40" stroke="#262626" stroke-width="8"></circle>
+            <circle cx="50" cy="50" fill="transparent" id="statsFuelArc" r="40" stroke="#cafd00" stroke-dasharray="251.2" stroke-dashoffset="100.48" stroke-linecap="round" stroke-width="8"></circle>
+            <circle cx="50" cy="50" fill="transparent" id="statsOtherArc" r="40" stroke="#bf81ff" stroke-dasharray="251.2" stroke-dashoffset="210" stroke-linecap="round" stroke-width="8"></circle>
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center">
+            <span class="text-on-surface-variant text-xs font-bold uppercase">加油占比</span>
+            <span class="text-primary-fixed text-2xl font-bold" id="statsFuelShare">60%</span>
+          </div>
+        </div>
+      </div>
+      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square">
+        <span class="material-symbols-outlined text-primary-fixed text-3xl" data-icon="electric_car">electric_car</span>
+        <div>
+          <p class="text-on-surface-variant text-xs mb-1">平均每日</p>
+          <p class="font-headline text-xl font-bold" id="statsDailyAverage">138.08</p>
+        </div>
+      </div>
+      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square">
+        <span class="material-symbols-outlined text-secondary text-3xl" data-icon="account_balance_wallet">account_balance_wallet</span>
+        <div>
+          <p class="text-on-surface-variant text-xs mb-1">上月对比</p>
+          <p class="font-headline text-xl font-bold text-error" id="statsMonthCompare">+12%</p>
+        </div>
+      </div>
+    </div>
+    <section class="mb-12">
+      <div class="flex justify-between items-end mb-6">
+        <h3 class="font-headline text-xl font-medium">分类明细</h3>
+        <span class="text-secondary font-label text-[0.75rem] font-bold uppercase">查看全部</span>
+      </div>
+      <div class="space-y-6">
+        <div class="flex items-center gap-5">
+          <div class="w-12 h-12 rounded-full bg-primary-fixed/10 flex items-center justify-center">
+            <span class="material-symbols-outlined text-primary-fixed" data-icon="local_gas_station">local_gas_station</span>
+          </div>
+          <div class="flex-1">
+            <p class="font-bold text-on-surface">加油</p>
+            <p class="text-xs text-on-surface-variant" id="statsFuelCount">共计 4 次</p>
+          </div>
+          <p class="font-headline font-bold" id="statsFuelAmount">2568.30</p>
+        </div>
+        <div class="flex items-center gap-5">
+          <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
+            <span class="material-symbols-outlined text-secondary" data-icon="build">build</span>
+          </div>
+          <div class="flex-1">
+            <p class="font-bold text-on-surface">保养</p>
+            <p class="text-xs text-on-surface-variant" id="statsMaintenanceCount">共计 1 次</p>
+          </div>
+          <p class="font-headline font-bold" id="statsMaintenanceAmount">1200.00</p>
+        </div>
+        <div class="flex items-center gap-5">
+          <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
+            <span class="material-symbols-outlined text-on-surface-variant" data-icon="water_drop">water_drop</span>
+          </div>
+          <div class="flex-1">
+            <p class="font-bold text-on-surface">洗车</p>
+            <p class="text-xs text-on-surface-variant" id="statsWashCount">共计 3 次</p>
+          </div>
+          <p class="font-headline font-bold" id="statsWashAmount">150.00</p>
+        </div>
+        <div class="flex items-center gap-5">
+          <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
+            <span class="material-symbols-outlined text-error" data-icon="fmd_bad">fmd_bad</span>
+          </div>
+          <div class="flex-1">
+            <p class="font-bold text-on-surface">维修</p>
+            <p class="text-xs text-on-surface-variant" id="statsRepairCount">共计 0 次</p>
+          </div>
+          <p class="font-headline font-bold" id="statsRepairAmount">0.00</p>
+        </div>
+        <div class="flex items-center gap-5">
+          <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
+            <span class="material-symbols-outlined text-on-surface-variant" data-icon="settings_input_component">settings_input_component</span>
+          </div>
+          <div class="flex-1">
+            <p class="font-bold text-on-surface">配件</p>
+            <p class="text-xs text-on-surface-variant" id="statsAccessoryCount">雨刮器等</p>
+          </div>
+          <p class="font-headline font-bold" id="statsAccessoryAmount">362.20</p>
+        </div>
+        <div class="flex items-center gap-5">
+          <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
+            <span class="material-symbols-outlined text-on-surface-variant" data-icon="dashboard_customize">dashboard_customize</span>
+          </div>
+          <div class="flex-1">
+            <p class="font-bold text-on-surface">配饰</p>
+            <p class="text-xs text-on-surface-variant" id="statsDecorationCount">共计 1 次</p>
+          </div>
+          <p class="font-headline font-bold" id="statsDecorationAmount">0.00</p>
+        </div>
+      </div>
+    </section>
+    <section class="mt-8">
+      <div class="bg-gradient-to-br from-surface-container to-surface-container-low rounded-xl p-8 border border-white/5 relative overflow-hidden group">
+        <div class="absolute -right-8 -bottom-8 opacity-10 group-hover:opacity-20 transition-opacity">
+          <span class="material-symbols-outlined text-[120px]" data-icon="auto_awesome">auto_awesome</span>
+        </div>
+        <p class="font-headline text-lg italic text-on-surface/90 leading-relaxed relative z-10">
+          “ 油箱满了，心情也满了。路在脚下，心在远方。 ”
+        </p>
+        <div class="mt-4 flex items-center gap-2 relative z-10">
+          <div class="w-1 h-1 rounded-full bg-primary-fixed"></div>
+          <p class="text-on-surface-variant text-[10px] font-bold tracking-widest uppercase">今日随笔</p>
+        </div>
+      </div>
+    </section>
+  </main>
+  <nav class="fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)] no-border tonal-shift">
+    <div class="flex justify-around items-center h-20 px-4 pb-safe w-full">
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
+        <span class="material-symbols-outlined" data-icon="speed">speed</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">看板</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
+        <span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">记录</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
+        <span class="material-symbols-outlined" data-icon="insights" style="font-variation-settings: 'FILL' 1;">insights</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">趋势</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
+        <span class="material-symbols-outlined" data-icon="history">history</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">历史</span>
+      </a>
+      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
+        <span class="material-symbols-outlined" data-icon="settings">settings</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">设置</span>
+      </a>
+    </div>
+  </nav>
+  <script defer src="./app.js"></script>
+</body>
+</html>
