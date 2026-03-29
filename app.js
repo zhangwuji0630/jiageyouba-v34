@@ -1,45 +1,66 @@
-const STORAGE_KEYS = {
+const DB_NAME = "jiageyouba-v34-db";
+const DB_VERSION = 1;
+const APP_SETTINGS_ID = "app";
+
+const STORES = Object.freeze({
+  meta: "meta",
+  settings: "settings",
+  vehicles: "vehicles",
+  stations: "stations",
+  records: "records",
+});
+
+const LEGACY_STORAGE_KEYS = Object.freeze({
   records: "jiageyouba:v34:records",
   settings: "jiageyouba:v34:settings",
-};
+});
 
-const DEFAULT_SETTINGS = {
-  unit: "metric",
-  garage: {
-    current: {
-      name: "保时捷 911 GT3",
-      plate: "沪A · 911GT3",
-    },
-    backup: {
-      name: "路虎 卫士 110",
-      mileageKm: 4500.5,
-    },
-  },
-};
-
+const CATEGORY_ORDER = ["fuel", "maintenance", "wash", "repair", "accessory", "decoration"];
 const FUEL_TYPES = ["92#", "95#", "98#"];
-const LITERS_PER_GALLON = 3.785411784;
 const MILES_PER_KM = 0.621371;
 const DONUT_CIRCUMFERENCE = 251.2;
 
-function readJson(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
+const CATEGORY_META = Object.freeze({
+  fuel: { label: "加油" },
+  maintenance: { label: "保养" },
+  wash: { label: "洗车" },
+  repair: { label: "维修" },
+  accessory: { label: "配件" },
+  decoration: { label: "配饰" },
+});
 
-function writeJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
+const FLASH_MESSAGES = Object.freeze({
+  saved: "记录已保存",
+  updated: "记录已更新",
+  imported: "备份已恢复",
+  themeSoon: "浅色主题会单独设计，这一版先固定深色",
+  vehicleSwitched: "已切换当前驾驶车辆",
+});
 
-function createId() {
+const DEFAULT_THEME_MESSAGE = "浅色主题会单独设计，这一版先固定深色";
+const DEFAULT_MODULE_MESSAGE = "该模块的数据模型已经预留，录入页会在下一轮接入";
+const DEFAULT_GENERIC_EDIT_MESSAGE = "该记录将在对应模块中编辑，当前版本先完成数据归档";
+
+let databasePromise = null;
+let toastTimer = 0;
+
+function createId(prefix = "id") {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+    return `${prefix}-${crypto.randomUUID()}`;
   }
-  return `record-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function getToday(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  date.setHours(0, 0, 0, 0);
+  const timezoneOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
 }
 
 function asNumber(value) {
@@ -47,11 +68,8 @@ function asNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getToday(offsetDays = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offsetDays);
-  const timezoneOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 10);
+function roundNumber(value, digits = 2) {
+  return Number(asNumber(value).toFixed(digits));
 }
 
 function formatNumber(value, digits = 2) {
@@ -68,13 +86,18 @@ function formatInteger(value) {
 }
 
 function formatDateHeading(value) {
-  if (!value) return "--";
-  const [year, month, day] = String(value).split("-");
+  if (!value) {
+    return "--";
+  }
+  const [year = "--", month = "--", day = "--"] = String(value).split("-");
   return `${year}年${month}月${day}日`;
 }
 
 function formatTime(value) {
-  if (!value) return "--:--";
+  if (!value) {
+    return "--:--";
+  }
+
   return new Intl.DateTimeFormat("zh-CN", {
     hour: "2-digit",
     minute: "2-digit",
@@ -83,203 +106,660 @@ function formatTime(value) {
 }
 
 function monthKey(value) {
-  const date = new Date(`${value}T00:00:00`);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+  return String(value || "").slice(0, 7);
 }
 
 function previousMonthKey(value) {
-  const [yearText, monthText] = value.split("-");
+  const [yearText = "1970", monthText = "01"] = String(value || "").split("-");
   const date = new Date(Number(yearText), Number(monthText) - 2, 1);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function normalizeRecord(raw = {}) {
-  const liters = asNumber(raw.liters);
-  const totalCost = asNumber(raw.totalCost);
-  const createdAt = raw.createdAt || new Date().toISOString();
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function setText(id, value) {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = value;
+  }
+}
+
+function getCategoryLabel(kind) {
+  return CATEGORY_META[kind]?.label || CATEGORY_META.fuel.label;
+}
+
+function compareRecordsDesc(left, right) {
+  if (left.date !== right.date) {
+    return String(right.date).localeCompare(String(left.date));
+  }
+  return String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""));
+}
+
+function compareRecordsChronological(left, right) {
+  if (left.date !== right.date) {
+    return String(left.date).localeCompare(String(right.date));
+  }
+  return String(left.createdAt || left.updatedAt || "").localeCompare(String(right.createdAt || right.updatedAt || ""));
+}
+
+function compareRecordsByOdometer(left, right) {
+  if (left.odometerKm !== right.odometerKm) {
+    return left.odometerKm - right.odometerKm;
+  }
+  return compareRecordsChronological(left, right);
+}
+
+function compareVehiclesByFreshness(left, right) {
+  return String(right.updatedAt || right.createdAt || "").localeCompare(String(left.updatedAt || left.createdAt || ""));
+}
+
+function dedupeById(items) {
+  const map = new Map();
+  items.forEach((item) => {
+    if (item?.id) {
+      map.set(item.id, item);
+    }
+  });
+  return [...map.values()];
+}
+
+function dedupeMeta(items) {
+  const map = new Map();
+  items.forEach((item) => {
+    if (item?.key) {
+      map.set(item.key, item);
+    }
+  });
+  return [...map.values()];
+}
+
+function normalizeSettings(raw = {}) {
+  const createdAt = raw.createdAt || nowIso();
   const updatedAt = raw.updatedAt || createdAt;
 
   return {
-    id: raw.id || createId(),
-    date: String(raw.date || getToday()),
-    odometer: asNumber(raw.odometer),
-    totalCost: Number(totalCost.toFixed(2)),
-    liters: Number(liters.toFixed(2)),
-    unitPrice: liters > 0 ? Number((totalCost / liters).toFixed(3)) : 0,
-    fuelType: String(raw.fuelType || "95#"),
-    isFullTank: Boolean(raw.isFullTank),
+    id: APP_SETTINGS_ID,
+    unit: raw.unit === "imperial" ? "imperial" : "metric",
+    theme: "dark",
+    currency: "CNY",
+    activeVehicleId: String(raw.activeVehicleId || ""),
     createdAt,
     updatedAt,
   };
 }
 
-function compareRecordsDesc(left, right) {
-  if (left.date !== right.date) {
-    return right.date.localeCompare(left.date);
-  }
-  return String(right.updatedAt || "").localeCompare(String(left.updatedAt || ""));
-}
+function normalizeVehicle(raw = {}) {
+  const createdAt = raw.createdAt || nowIso();
+  const updatedAt = raw.updatedAt || createdAt;
 
-function compareRecordsChronological(left, right) {
-  if (left.date !== right.date) {
-    return left.date.localeCompare(right.date);
-  }
-  return String(left.createdAt || left.updatedAt || "").localeCompare(String(right.createdAt || right.updatedAt || ""));
-}
-
-function compareRecordsByMileage(left, right) {
-  if (left.odometer !== right.odometer) {
-    return left.odometer - right.odometer;
-  }
-  return compareRecordsChronological(left, right);
-}
-
-function loadRecords() {
-  return readJson(STORAGE_KEYS.records, []).map(normalizeRecord).sort(compareRecordsDesc);
-}
-
-function saveRecords(records) {
-  writeJson(
-    STORAGE_KEYS.records,
-    records.map(normalizeRecord).sort(compareRecordsDesc)
-  );
-}
-
-function loadSettings() {
-  const stored = readJson(STORAGE_KEYS.settings, {});
   return {
-    ...DEFAULT_SETTINGS,
-    ...stored,
-    garage: {
-      current: {
-        ...DEFAULT_SETTINGS.garage.current,
-        ...(stored.garage?.current || {}),
+    id: String(raw.id || createId("vehicle")),
+    name: String(raw.name || "未命名车辆"),
+    plate: String(raw.plate || ""),
+    mileageKm: Math.max(0, roundNumber(raw.mileageKm, 1)),
+    isArchived: Boolean(raw.isArchived),
+    createdAt,
+    updatedAt,
+  };
+}
+
+function normalizeStation(raw = {}) {
+  const createdAt = raw.createdAt || nowIso();
+  const updatedAt = raw.updatedAt || createdAt;
+
+  return {
+    id: String(raw.id || createId("station")),
+    name: String(raw.name || ""),
+    city: String(raw.city || ""),
+    brand: String(raw.brand || ""),
+    createdAt,
+    updatedAt,
+  };
+}
+
+function normalizeFuelPayload(raw = {}) {
+  const liters = roundNumber(raw.liters, 2);
+  const amount = asNumber(raw.amount ?? raw.totalCost);
+  const unitPrice =
+    raw.unitPrice !== undefined
+      ? roundNumber(raw.unitPrice, 3)
+      : liters > 0
+        ? roundNumber(amount / liters, 3)
+        : 0;
+
+  return {
+    liters,
+    fuelType: FUEL_TYPES.includes(raw.fuelType) ? raw.fuelType : "95#",
+    isFullTank: Boolean(raw.isFullTank),
+    unitPrice,
+    stationId: String(raw.stationId || ""),
+  };
+}
+
+function normalizeRecord(raw = {}) {
+  const createdAt = raw.createdAt || nowIso();
+  const updatedAt = raw.updatedAt || createdAt;
+  const kind = CATEGORY_ORDER.includes(raw.kind) ? raw.kind : "fuel";
+  const amount = roundNumber(raw.amount ?? raw.totalCost, 2);
+  const payload = kind === "fuel" ? normalizeFuelPayload(raw.payload || raw) : { ...(raw.payload || {}) };
+
+  return {
+    id: String(raw.id || createId("record")),
+    vehicleId: String(raw.vehicleId || ""),
+    stationId: String(raw.stationId || payload.stationId || ""),
+    kind,
+    date: String(raw.date || getToday()),
+    amount,
+    odometerKm: Math.max(0, roundNumber(raw.odometerKm ?? raw.odometer, 0)),
+    title: String(raw.title || (kind === "fuel" ? `${payload.fuelType} 汽油` : getCategoryLabel(kind))),
+    note: String(raw.note || ""),
+    payload,
+    createdAt,
+    updatedAt,
+  };
+}
+
+function createDefaultSnapshot() {
+  const createdAt = nowIso();
+  const currentVehicle = normalizeVehicle({
+    id: createId("vehicle"),
+    name: "保时捷 911 GT3",
+    plate: "沪A · 911GT3",
+    mileageKm: 12450,
+    createdAt,
+    updatedAt: createdAt,
+  });
+  const backupVehicle = normalizeVehicle({
+    id: createId("vehicle"),
+    name: "路虎 卫士 110",
+    plate: "",
+    mileageKm: 4500.5,
+    createdAt,
+    updatedAt: createdAt,
+  });
+
+  return {
+    settings: normalizeSettings({
+      activeVehicleId: currentVehicle.id,
+      createdAt,
+      updatedAt: createdAt,
+    }),
+    vehicles: [currentVehicle, backupVehicle],
+    stations: [],
+    records: [],
+    meta: [{ key: "bootstrappedAt", value: createdAt }],
+  };
+}
+
+function normalizeSnapshot(snapshot = {}) {
+  const defaults = createDefaultSnapshot();
+  let vehicles = Array.isArray(snapshot.vehicles) ? snapshot.vehicles.map(normalizeVehicle) : [];
+  let stations = Array.isArray(snapshot.stations) ? snapshot.stations.map(normalizeStation) : [];
+  let records = Array.isArray(snapshot.records) ? snapshot.records.map(normalizeRecord) : [];
+  let settings = normalizeSettings(snapshot.settings || defaults.settings);
+  const meta = dedupeMeta([...(snapshot.meta || []), { key: "schemaVersion", value: String(DB_VERSION) }]);
+
+  vehicles = dedupeById(vehicles);
+  stations = dedupeById(stations);
+
+  if (!vehicles.length) {
+    vehicles = defaults.vehicles;
+  }
+
+  const vehicleIds = new Set(vehicles.map((vehicle) => vehicle.id));
+  records = dedupeById(records)
+    .filter((record) => vehicleIds.has(record.vehicleId))
+    .sort(compareRecordsDesc);
+
+  const mileageByVehicleId = new Map();
+  records.forEach((record) => {
+    if (record.odometerKm > 0) {
+      mileageByVehicleId.set(record.vehicleId, Math.max(mileageByVehicleId.get(record.vehicleId) || 0, record.odometerKm));
+    }
+  });
+
+  vehicles = vehicles
+    .map((vehicle) =>
+      normalizeVehicle({
+        ...vehicle,
+        mileageKm: Math.max(vehicle.mileageKm, mileageByVehicleId.get(vehicle.id) || 0),
+      })
+    )
+    .sort(compareVehiclesByFreshness);
+
+  if (!vehicles.some((vehicle) => vehicle.id === settings.activeVehicleId)) {
+    settings = normalizeSettings({
+      ...settings,
+      activeVehicleId: vehicles[0]?.id || "",
+      updatedAt: nowIso(),
+    });
+  }
+
+  return {
+    settings,
+    vehicles,
+    stations,
+    records,
+    meta,
+  };
+}
+
+function readLegacyJson(key, fallback) {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function readLegacySnapshot() {
+  const legacySettings = readLegacyJson(LEGACY_STORAGE_KEYS.settings, null);
+  const legacyRecords = readLegacyJson(LEGACY_STORAGE_KEYS.records, null);
+  const hasSettings = legacySettings && typeof legacySettings === "object" && Object.keys(legacySettings).length > 0;
+  const hasRecords = Array.isArray(legacyRecords) && legacyRecords.length > 0;
+
+  if (!hasSettings && !hasRecords) {
+    return null;
+  }
+
+  return {
+    settings: legacySettings || {},
+    records: Array.isArray(legacyRecords) ? legacyRecords : [],
+  };
+}
+
+function migrateLegacyPayload(payload = {}) {
+  const defaults = createDefaultSnapshot();
+  const legacySettings = payload.settings || {};
+  const legacyCurrent = legacySettings.garage?.current || {};
+  const legacyBackup = legacySettings.garage?.backup || {};
+
+  const activeVehicle = normalizeVehicle({
+    ...defaults.vehicles[0],
+    name: legacyCurrent.name || defaults.vehicles[0].name,
+    plate: legacyCurrent.plate || defaults.vehicles[0].plate,
+  });
+
+  const backupVehicle = normalizeVehicle({
+    ...defaults.vehicles[1],
+    name: legacyBackup.name || defaults.vehicles[1].name,
+    plate: legacyBackup.plate || defaults.vehicles[1].plate,
+    mileageKm: asNumber(legacyBackup.mileageKm || defaults.vehicles[1].mileageKm),
+  });
+
+  const records = (Array.isArray(payload.records) ? payload.records : []).map((legacyRecord) => {
+    const fuelType = FUEL_TYPES.includes(legacyRecord.fuelType) ? legacyRecord.fuelType : "95#";
+    return normalizeRecord({
+      id: legacyRecord.id,
+      vehicleId: activeVehicle.id,
+      kind: "fuel",
+      date: legacyRecord.date,
+      amount: legacyRecord.totalCost,
+      odometerKm: legacyRecord.odometer,
+      title: `${fuelType} 汽油`,
+      createdAt: legacyRecord.createdAt,
+      updatedAt: legacyRecord.updatedAt,
+      payload: {
+        liters: legacyRecord.liters,
+        fuelType,
+        isFullTank: legacyRecord.isFullTank,
+        unitPrice: legacyRecord.unitPrice,
       },
-      backup: {
-        ...DEFAULT_SETTINGS.garage.backup,
-        ...(stored.garage?.backup || {}),
-      },
+    });
+  });
+
+  return normalizeSnapshot({
+    settings: {
+      unit: legacySettings.unit,
+      activeVehicleId: activeVehicle.id,
+      createdAt: defaults.settings.createdAt,
+      updatedAt: nowIso(),
     },
-  };
+    vehicles: [activeVehicle, backupVehicle],
+    stations: [],
+    records,
+    meta: [{ key: "legacyMigratedAt", value: nowIso() }],
+  });
 }
 
-function saveSettings(settings) {
-  writeJson(STORAGE_KEYS.settings, settings);
+function normalizeImportedSnapshot(payload) {
+  if (!payload || typeof payload !== "object") {
+    throw new Error("导入内容不是有效的 JSON 对象");
+  }
+
+  if (Array.isArray(payload.vehicles) || Array.isArray(payload.stations) || payload.settings?.activeVehicleId) {
+    return normalizeSnapshot(payload);
+  }
+
+  if (Array.isArray(payload.records)) {
+    return migrateLegacyPayload(payload);
+  }
+
+  throw new Error("备份文件格式不支持");
 }
 
-function getNeighbors(records, recordId) {
-  const ordered = [...records].sort(compareRecordsChronological);
-  const index = ordered.findIndex((record) => record.id === recordId);
+function cleanupLegacyStorage() {
+  try {
+    window.localStorage.removeItem(LEGACY_STORAGE_KEYS.records);
+    window.localStorage.removeItem(LEGACY_STORAGE_KEYS.settings);
+  } catch {
+    // Ignore cleanup failures.
+  }
+}
+
+function requestToPromise(request) {
+  return new Promise((resolve, reject) => {
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error));
+  });
+}
+
+function transactionToPromise(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.addEventListener("complete", () => resolve());
+    transaction.addEventListener("error", () => reject(transaction.error));
+    transaction.addEventListener("abort", () => reject(transaction.error || new Error("IndexedDB transaction aborted")));
+  });
+}
+
+function openDatabase() {
+  if (databasePromise) {
+    return databasePromise;
+  }
+
+  databasePromise = new Promise((resolve, reject) => {
+    if (!("indexedDB" in window)) {
+      reject(new Error("当前浏览器不支持 IndexedDB"));
+      return;
+    }
+
+    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.addEventListener("upgradeneeded", () => {
+      const database = request.result;
+
+      if (!database.objectStoreNames.contains(STORES.meta)) {
+        database.createObjectStore(STORES.meta, { keyPath: "key" });
+      }
+
+      if (!database.objectStoreNames.contains(STORES.settings)) {
+        database.createObjectStore(STORES.settings, { keyPath: "id" });
+      }
+
+      if (!database.objectStoreNames.contains(STORES.vehicles)) {
+        const vehiclesStore = database.createObjectStore(STORES.vehicles, { keyPath: "id" });
+        vehiclesStore.createIndex("byUpdatedAt", "updatedAt", { unique: false });
+      }
+
+      if (!database.objectStoreNames.contains(STORES.stations)) {
+        const stationsStore = database.createObjectStore(STORES.stations, { keyPath: "id" });
+        stationsStore.createIndex("byName", "name", { unique: false });
+      }
+
+      if (!database.objectStoreNames.contains(STORES.records)) {
+        const recordsStore = database.createObjectStore(STORES.records, { keyPath: "id" });
+        recordsStore.createIndex("byVehicleId", "vehicleId", { unique: false });
+        recordsStore.createIndex("byKind", "kind", { unique: false });
+        recordsStore.createIndex("byDate", "date", { unique: false });
+        recordsStore.createIndex("byUpdatedAt", "updatedAt", { unique: false });
+      }
+    });
+
+    request.addEventListener("success", () => resolve(request.result));
+    request.addEventListener("error", () => reject(request.error));
+  });
+
+  return databasePromise;
+}
+
+async function readRawSnapshot() {
+  const database = await openDatabase();
+  const transaction = database.transaction(Object.values(STORES), "readonly");
+
+  const settingsPromise = requestToPromise(transaction.objectStore(STORES.settings).get(APP_SETTINGS_ID));
+  const vehiclesPromise = requestToPromise(transaction.objectStore(STORES.vehicles).getAll());
+  const stationsPromise = requestToPromise(transaction.objectStore(STORES.stations).getAll());
+  const recordsPromise = requestToPromise(transaction.objectStore(STORES.records).getAll());
+  const metaPromise = requestToPromise(transaction.objectStore(STORES.meta).getAll());
+
+  const [settings, vehicles, stations, records, meta] = await Promise.all([
+    settingsPromise,
+    vehiclesPromise,
+    stationsPromise,
+    recordsPromise,
+    metaPromise,
+  ]);
 
   return {
-    previous: index > 0 ? ordered[index - 1] : null,
-    next: index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null,
+    settings: settings || null,
+    vehicles: Array.isArray(vehicles) ? vehicles : [],
+    stations: Array.isArray(stations) ? stations : [],
+    records: Array.isArray(records) ? records : [],
+    meta: Array.isArray(meta) ? meta : [],
   };
 }
 
-function validateOdometer(records, candidateRecord) {
-  const { previous, next } = getNeighbors(records, candidateRecord.id);
+async function saveSnapshot(snapshot, extraMeta = []) {
+  const nextSnapshot = normalizeSnapshot({
+    ...snapshot,
+    meta: [...(snapshot.meta || []), ...extraMeta, { key: "savedAt", value: nowIso() }],
+  });
+  const database = await openDatabase();
+  const transaction = database.transaction(Object.values(STORES), "readwrite");
 
-  if (previous && candidateRecord.odometer < previous.odometer) {
-    return `当前里程不能小于上一条记录（${formatDateHeading(previous.date)}，${formatInteger(previous.odometer)} km）`;
-  }
+  Object.values(STORES).forEach((storeName) => {
+    transaction.objectStore(storeName).clear();
+  });
 
-  if (next && candidateRecord.odometer > next.odometer) {
-    return `当前里程不能大于下一条记录（${formatDateHeading(next.date)}，${formatInteger(next.odometer)} km）`;
-  }
+  transaction.objectStore(STORES.settings).put(nextSnapshot.settings);
+  nextSnapshot.vehicles.forEach((vehicle) => transaction.objectStore(STORES.vehicles).put(vehicle));
+  nextSnapshot.stations.forEach((station) => transaction.objectStore(STORES.stations).put(station));
+  nextSnapshot.records.forEach((record) => transaction.objectStore(STORES.records).put(record));
+  nextSnapshot.meta.forEach((entry) => transaction.objectStore(STORES.meta).put(entry));
 
-  return "";
+  await transactionToPromise(transaction);
 }
 
-function buildEfficiencySeries(records) {
-  const ordered = [...records]
-    .filter((record) => record.odometer > 0 && record.liters > 0)
-    .sort(compareRecordsByMileage);
+async function bootstrapDatabase() {
+  const raw = await readRawSnapshot();
+  if (raw.settings && raw.vehicles.length > 0) {
+    return;
+  }
+
+  const legacy = readLegacySnapshot();
+  const snapshot = legacy ? migrateLegacyPayload(legacy) : createDefaultSnapshot();
+  await saveSnapshot(snapshot, [
+    {
+      key: legacy ? "legacyBootstrappedAt" : "bootstrappedAt",
+      value: nowIso(),
+    },
+  ]);
+
+  if (legacy) {
+    cleanupLegacyStorage();
+  }
+}
+
+async function loadSnapshot() {
+  return normalizeSnapshot(await readRawSnapshot());
+}
+
+function getVehicleMap(snapshot) {
+  return new Map(snapshot.vehicles.map((vehicle) => [vehicle.id, vehicle]));
+}
+
+function getActiveVehicle(snapshot) {
+  return snapshot.vehicles.find((vehicle) => vehicle.id === snapshot.settings.activeVehicleId) || snapshot.vehicles[0] || null;
+}
+
+function getSecondaryVehicle(snapshot) {
+  const activeVehicle = getActiveVehicle(snapshot);
+  return snapshot.vehicles.find((vehicle) => vehicle.id !== activeVehicle?.id) || null;
+}
+
+function getRecordsForVehicle(snapshot, vehicleId) {
+  return snapshot.records.filter((record) => record.vehicleId === vehicleId).sort(compareRecordsDesc);
+}
+
+function getFuelRecords(records) {
+  return records.filter((record) => record.kind === "fuel");
+}
+
+function getFuelPayload(record) {
+  return normalizeFuelPayload(record.payload || {});
+}
+
+function buildFuelEfficiencySeries(records) {
+  const ordered = getFuelRecords(records)
+    .filter((record) => record.odometerKm > 0 && getFuelPayload(record).liters > 0)
+    .sort(compareRecordsByOdometer);
 
   const series = [];
   let anchor = null;
-  let liters = 0;
+  let litersSinceAnchor = 0;
 
   ordered.forEach((record) => {
+    const payload = getFuelPayload(record);
+
     if (!anchor) {
-      if (record.isFullTank) {
+      if (payload.isFullTank) {
         anchor = record;
       }
       return;
     }
 
-    if (record.odometer <= anchor.odometer) {
-      if (record.isFullTank) {
+    if (record.odometerKm <= anchor.odometerKm) {
+      if (payload.isFullTank) {
         anchor = record;
-        liters = 0;
+        litersSinceAnchor = 0;
       }
       return;
     }
 
-    liters += record.liters;
-    if (!record.isFullTank) {
+    litersSinceAnchor += payload.liters;
+
+    if (!payload.isFullTank) {
       return;
     }
 
-    const distance = record.odometer - anchor.odometer;
-    const value = distance > 0 ? (liters * 100) / distance : 0;
+    const distanceKm = record.odometerKm - anchor.odometerKm;
+    const litersPer100Km = distanceKm > 0 ? (litersSinceAnchor * 100) / distanceKm : 0;
 
-    if (value > 1 && value < 30) {
+    if (litersPer100Km > 1 && litersPer100Km < 30) {
       series.push({
         recordId: record.id,
         date: record.date,
-        value,
-        distance,
-        liters,
+        litersPer100Km,
+        distanceKm,
       });
     }
 
     anchor = record;
-    liters = 0;
+    litersSinceAnchor = 0;
   });
 
   return series;
 }
 
-function summarize(records, efficiencySeries) {
-  const totalSpend = records.reduce((sum, record) => sum + record.totalCost, 0);
-  const totalLiters = records.reduce((sum, record) => sum + record.liters, 0);
-  const odometers = records.map((record) => record.odometer).filter((value) => value > 0);
-  const distanceCoverage = odometers.length > 1 ? Math.max(...odometers) - Math.min(...odometers) : 0;
+function getDistanceCoverage(records) {
+  const odometers = records.map((record) => record.odometerKm).filter((value) => value > 0);
+  if (odometers.length < 2) {
+    return 0;
+  }
+  return Math.max(...odometers) - Math.min(...odometers);
+}
+
+function sumAmounts(records) {
+  return records.reduce((sum, record) => sum + asNumber(record.amount), 0);
+}
+
+function summarizeByKind(records) {
+  return CATEGORY_ORDER.reduce((summary, kind) => {
+    const scoped = records.filter((record) => record.kind === kind);
+    summary[kind] = {
+      count: scoped.length,
+      amount: sumAmounts(scoped),
+    };
+    return summary;
+  }, {});
+}
+
+function getMonthScopedRecords(records, targetMonth) {
+  return records.filter((record) => monthKey(record.date) === targetMonth);
+}
+
+function getVehicleAnalytics(snapshot, vehicleId) {
+  const vehicleRecords = getRecordsForVehicle(snapshot, vehicleId);
+  const currentMonth = monthKey(getToday());
+  const previousMonth = previousMonthKey(currentMonth);
+  const fuelSeries = buildFuelEfficiencySeries(vehicleRecords);
+  const currentFuelSeries = fuelSeries.filter((item) => monthKey(item.date) === currentMonth);
+  const previousFuelSeries = fuelSeries.filter((item) => monthKey(item.date) === previousMonth);
 
   return {
-    count: records.length,
-    totalSpend,
-    totalLiters,
-    distanceCoverage,
-    avgPrice: totalLiters > 0 ? totalSpend / totalLiters : 0,
-    avgEfficiency:
-      efficiencySeries.length > 0
-        ? efficiencySeries.reduce((sum, item) => sum + item.value, 0) / efficiencySeries.length
-        : 0,
+    allRecords: vehicleRecords,
+    currentMonthRecords: getMonthScopedRecords(vehicleRecords, currentMonth),
+    previousMonthRecords: getMonthScopedRecords(vehicleRecords, previousMonth),
+    fuelSeries,
+    currentFuelSeries,
+    previousFuelSeries,
+    efficiencyByRecordId: new Map(fuelSeries.map((item) => [item.recordId, item.litersPer100Km])),
   };
 }
 
-function deriveData(records) {
-  const current = monthKey(getToday());
-  const previous = previousMonthKey(current);
-  const efficiencySeries = buildEfficiencySeries(records);
-  const currentMonthRecords = records.filter((record) => monthKey(record.date) === current);
-  const previousMonthRecords = records.filter((record) => monthKey(record.date) === previous);
-  const currentEfficiency = efficiencySeries.filter((item) => monthKey(item.date) === current);
-  const previousEfficiency = efficiencySeries.filter((item) => monthKey(item.date) === previous);
-
-  return {
-    all: summarize(records, efficiencySeries),
-    monthly: summarize(currentMonthRecords, currentEfficiency),
-    previousMonthly: summarize(previousMonthRecords, previousEfficiency),
-    efficiencyByRecordId: new Map(efficiencySeries.map((item) => [item.recordId, item.value])),
-  };
+function averageEfficiency(series) {
+  if (!series.length) {
+    return 0;
+  }
+  return series.reduce((sum, item) => sum + item.litersPer100Km, 0) / series.length;
 }
 
-function deltaLabel(currentValue, previousValue) {
+function formatDistanceValue(kilometers, unitMode, digits = 0) {
+  if (unitMode === "imperial") {
+    return formatNumber(kilometers * MILES_PER_KM, digits);
+  }
+  return digits === 0 ? formatInteger(kilometers) : formatNumber(kilometers, digits);
+}
+
+function formatDistanceUnit(unitMode) {
+  return unitMode === "imperial" ? "英里" : "公里";
+}
+
+function formatCompactEfficiency(litersPer100Km, unitMode) {
+  if (!litersPer100Km) {
+    return "--";
+  }
+
+  if (unitMode === "imperial") {
+    return `${formatNumber(235.214583 / litersPer100Km, 1)} MPG`;
+  }
+
+  return `${formatNumber(litersPer100Km, 1)} L/100`;
+}
+
+function formatDetailedEfficiency(litersPer100Km, unitMode) {
+  if (!litersPer100Km) {
+    return "--";
+  }
+
+  if (unitMode === "imperial") {
+    return `${formatNumber(235.214583 / litersPer100Km, 1)} MPG`;
+  }
+
+  return `${formatNumber(litersPer100Km, 1)} L/100KM`;
+}
+
+function getMonthDeltaLabel(currentValue, previousValue) {
   if (!currentValue && !previousValue) {
-    return "暂无变化";
+    return "较上月暂无变化";
   }
 
   if (!previousValue) {
@@ -290,47 +770,79 @@ function deltaLabel(currentValue, previousValue) {
   if (Math.abs(diff) < 1) {
     return "较上月持平";
   }
-  const direction = diff > 0 ? "增长" : "下降";
-  return `较上月${direction} ${formatNumber(Math.abs(diff), 0)}%`;
+  return diff > 0 ? `较上月增长 ${formatNumber(Math.abs(diff), 0)}%` : `较上月下降 ${formatNumber(Math.abs(diff), 0)}%`;
 }
 
-function getUnitMode() {
-  return loadSettings().unit === "imperial" ? "imperial" : "metric";
-}
-
-function formatDistanceDisplay(kilometers, unitMode, digits = 0) {
-  if (unitMode === "imperial") {
-    return formatNumber(kilometers * MILES_PER_KM, digits);
-  }
-  return digits === 0 ? formatInteger(kilometers) : formatNumber(kilometers, digits);
-}
-
-function formatEfficiencyDisplay(litersPer100Km, unitMode) {
-  if (!litersPer100Km) {
-    return "--";
+function getMonthCompareValue(currentValue, previousValue) {
+  if (!currentValue && !previousValue) {
+    return { text: "0%", diff: 0 };
   }
 
-  if (unitMode === "imperial") {
-    return `${formatNumber(235.214583 / litersPer100Km, 1)} MPG`;
+  if (!previousValue) {
+    return { text: "+100%", diff: 100 };
   }
 
-  return `${formatNumber(100 / litersPer100Km, 1)} KM/L`;
+  const diff = ((currentValue - previousValue) / previousValue) * 100;
+  const sign = diff > 0 ? "+" : "";
+  return {
+    text: `${sign}${formatNumber(diff, 0)}%`,
+    diff,
+  };
 }
 
-function setText(id, value) {
-  const element = document.getElementById(id);
-  if (element) {
-    element.textContent = value;
+function getCategoryCountLabel(count) {
+  return count > 0 ? `共计 ${count} 次` : "暂无记录";
+}
+
+function showToast(message, tone = "default") {
+  if (!message) {
+    return;
   }
+
+  let root = document.getElementById("appToastRoot");
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "appToastRoot";
+    root.className = "app-toast-root";
+    root.innerHTML = '<div id="appToast" class="app-toast" role="status" aria-live="polite"></div>';
+    document.body.append(root);
+  }
+
+  const toast = document.getElementById("appToast");
+  if (!toast) {
+    return;
+  }
+
+  toast.textContent = message;
+  toast.className = `app-toast app-toast--visible${tone === "warning" ? " app-toast--warning" : ""}`;
+
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => {
+    toast.className = "app-toast";
+  }, 2400);
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+function consumeFlash() {
+  const params = new URLSearchParams(window.location.search);
+  const flash = params.get("flash");
+  if (!flash) {
+    return "";
+  }
+
+  params.delete("flash");
+  const query = params.toString();
+  const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+  window.history.replaceState({}, "", nextUrl);
+  return flash;
+}
+
+function showFlash() {
+  const flash = consumeFlash();
+  if (!flash || !FLASH_MESSAGES[flash]) {
+    return;
+  }
+
+  window.setTimeout(() => showToast(FLASH_MESSAGES[flash]), 60);
 }
 
 function downloadFile(filename, content, mimeType) {
@@ -345,46 +857,56 @@ function downloadFile(filename, content, mimeType) {
   URL.revokeObjectURL(url);
 }
 
-function toCsv(records) {
-  const header = ["id", "date", "odometer", "totalCost", "liters", "unitPrice", "fuelType", "isFullTank", "createdAt", "updatedAt"];
-  const rows = records.map((record) =>
-    header.map((key) => {
-      const text = String(record[key] ?? "");
-      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-    })
-  );
+function toCsv(snapshot) {
+  const vehicleMap = getVehicleMap(snapshot);
+  const header = [
+    "id",
+    "kind",
+    "vehicleName",
+    "vehiclePlate",
+    "date",
+    "amount",
+    "odometerKm",
+    "liters",
+    "fuelType",
+    "isFullTank",
+    "title",
+    "note",
+    "createdAt",
+    "updatedAt",
+  ];
 
-  return [header, ...rows].map((row) => row.join(",")).join("\r\n");
-}
+  const rows = snapshot.records.map((record) => {
+    const vehicle = vehicleMap.get(record.vehicleId);
+    const payload = record.kind === "fuel" ? getFuelPayload(record) : {};
+    return [
+      record.id,
+      record.kind,
+      vehicle?.name || "",
+      vehicle?.plate || "",
+      record.date,
+      record.amount,
+      record.odometerKm,
+      payload.liters ?? "",
+      payload.fuelType ?? "",
+      payload.isFullTank ?? "",
+      record.title,
+      record.note,
+      record.createdAt,
+      record.updatedAt,
+    ];
+  });
 
-function consumeFlash() {
-  const params = new URLSearchParams(window.location.search);
-  const flash = params.get("flash");
-  if (!flash) {
-    return "";
-  }
-  params.delete("flash");
-  const query = params.toString();
-  const nextUrl = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
-  window.history.replaceState({}, "", nextUrl);
-  return flash;
-}
-
-function showFlash() {
-  const flash = consumeFlash();
-  if (!flash) {
-    return;
-  }
-
-  const messages = {
-    saved: "记录已保存",
-    updated: "记录已更新",
-    imported: "备份已恢复",
-  };
-
-  if (messages[flash]) {
-    window.setTimeout(() => window.alert(messages[flash]), 50);
-  }
+  return [header, ...rows]
+    .map((row) =>
+      row
+        .map((cell) => {
+          const text = String(cell ?? "");
+          return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        })
+        .join(",")
+    )
+    .join("\r\n");
 }
 
 function registerServiceWorker() {
@@ -397,89 +919,12 @@ function registerServiceWorker() {
   });
 }
 
-function initDashboardPage() {
-  const records = loadRecords();
-  const settings = loadSettings();
-  const unitMode = settings.unit;
-  const data = deriveData(records);
-
-  setText("dashboardMonthlySpend", formatNumber(data.monthly.totalSpend, 2));
-  setText("dashboardMonthlyDelta", deltaLabel(data.monthly.totalSpend, data.previousMonthly.totalSpend));
-  setText("dashboardMonthlyMileage", formatDistanceDisplay(data.monthly.distanceCoverage, unitMode, 0));
-  setText("dashboardMileageUnit", unitMode === "imperial" ? "英里" : "公里");
-  setText("dashboardAvgEfficiency", formatEfficiencyDisplay(data.monthly.avgEfficiency, unitMode));
-  setText("dashboardCurrentCarName", settings.garage.current.name);
-}
-
-function renderHistoryList() {
-  const records = loadRecords();
-  const settings = loadSettings();
-  const unitMode = settings.unit;
-  const data = deriveData(records);
-  const list = document.getElementById("historyList");
-
-  setText("logsTotalSpend", formatNumber(data.all.totalSpend, 2));
-
-  if (!list) {
-    return;
-  }
-
-  if (!records.length) {
-    list.innerHTML = `
-      <div class="group">
-        <div class="bg-surface-container rounded-lg p-6">
-          <p class="font-headline text-white font-bold text-lg">还没有加油记录</p>
-          <p class="font-body text-sm text-on-surface-variant mt-2">先去“记录”页添加第一条数据，趋势和历史会自动生成。</p>
-          <a class="inline-block mt-5 px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed font-bold text-sm" href="./add.html">去记录</a>
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  list.innerHTML = records
-    .map((record) => {
-      const efficiency = data.efficiencyByRecordId.get(record.id) || 0;
-      const efficiencyLabel = efficiency ? formatEfficiencyDisplay(efficiency, unitMode) : "--";
-      const odometerLabel = formatDistanceDisplay(record.odometer, unitMode, 0);
-      const odometerUnit = unitMode === "imperial" ? "MI" : "KM";
-
-      return `
-        <div class="group">
-          <div class="flex justify-between items-end mb-4">
-            <h2 class="font-headline text-on-surface font-medium text-[1.25rem]">${escapeHtml(formatDateHeading(record.date))}</h2>
-            <span class="font-label text-on-surface-variant text-[0.75rem] font-bold tracking-wider">${escapeHtml(formatTime(record.updatedAt || record.createdAt))}</span>
-          </div>
-          <a class="block bg-surface-container rounded-lg p-6 transition-all duration-300 active:scale-[0.98] active:bg-surface-container-high cursor-pointer" href="./add.html?id=${encodeURIComponent(record.id)}">
-            <div class="flex justify-between items-start mb-6">
-              <div>
-                <p class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-tighter mb-1">加油车辆</p>
-                <p class="font-headline text-white font-bold text-lg">${escapeHtml(settings.garage.current.plate)}</p>
-              </div>
-              <div class="text-right">
-                <p class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-tighter mb-1">实付金额</p>
-                <p class="font-headline text-primary-fixed font-bold text-xl">${escapeHtml(formatNumber(record.totalCost, 2))}</p>
-              </div>
-            </div>
-            <div class="grid grid-cols-3 gap-4 pt-4 border-t border-outline-variant/10">
-              <div>
-                <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">油耗</p>
-                <p class="font-headline text-white text-[0.9rem] font-medium">${escapeHtml(efficiencyLabel)}</p>
-              </div>
-              <div>
-                <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">当前里程</p>
-                <p class="font-headline text-white text-[0.9rem] font-medium">${escapeHtml(odometerLabel)} ${odometerUnit}</p>
-              </div>
-              <div class="text-right">
-                <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">加油量</p>
-                <p class="font-headline text-white text-[0.9rem] font-medium">${escapeHtml(formatNumber(record.liters, 2))} L</p>
-              </div>
-            </div>
-          </a>
-        </div>
-      `;
-    })
-    .join("");
+function bindThemeEntryPoints() {
+  ["dashboardThemeHint", "addThemeHint", "statsThemeHint", "logsThemeHint"].forEach((id) => {
+    document.getElementById(id)?.addEventListener("click", () => {
+      window.location.href = "./settings.html?flash=themeSoon#themePreferences";
+    });
+  });
 }
 
 function setFuelButtons(activeFuelType) {
@@ -492,163 +937,6 @@ function setFuelButtons(activeFuelType) {
   });
 }
 
-function initAddPage() {
-  const params = new URLSearchParams(window.location.search);
-  const editingId = params.get("id");
-  const records = loadRecords();
-  const editingRecord = records.find((record) => record.id === editingId) || null;
-
-  const form = document.getElementById("recordForm");
-  const dateInput = document.getElementById("recordDate");
-  const odometerInput = document.getElementById("recordOdometer");
-  const totalCostInput = document.getElementById("recordTotalCost");
-  const litersInput = document.getElementById("recordLiters");
-  const fullTankInput = document.getElementById("recordFullTank");
-  const unitPriceDisplay = document.getElementById("recordUnitPriceDisplay");
-  const pageHeading = document.getElementById("addPageHeading");
-  const topTitle = document.getElementById("addPageTitle");
-
-  let selectedFuelType = editingRecord?.fuelType || "95#";
-
-  if (pageHeading && editingRecord) {
-    pageHeading.textContent = "编辑本次旅程";
-  }
-  if (topTitle && editingRecord) {
-    topTitle.textContent = "编辑记录";
-  }
-
-  if (dateInput) {
-    dateInput.value = editingRecord?.date || getToday();
-  }
-  if (odometerInput) {
-    odometerInput.value = editingRecord?.odometer || "";
-  }
-  if (totalCostInput) {
-    totalCostInput.value = editingRecord?.totalCost || "";
-  }
-  if (litersInput) {
-    litersInput.value = editingRecord?.liters || "";
-  }
-  if (fullTankInput) {
-    fullTankInput.checked = editingRecord ? Boolean(editingRecord.isFullTank) : true;
-  }
-
-  function updateUnitPrice() {
-    const totalCost = asNumber(totalCostInput?.value);
-    const liters = asNumber(litersInput?.value);
-    setText("recordUnitPriceDisplay", liters > 0 ? formatNumber(totalCost / liters, 2) : "0.00");
-  }
-
-  function buildDraftRecord() {
-    return normalizeRecord({
-      ...(editingRecord || {}),
-      date: dateInput?.value || getToday(),
-      odometer: asNumber(odometerInput?.value),
-      totalCost: asNumber(totalCostInput?.value),
-      liters: asNumber(litersInput?.value),
-      fuelType: selectedFuelType,
-      isFullTank: Boolean(fullTankInput?.checked),
-      updatedAt: new Date().toISOString(),
-    });
-  }
-
-  function validate(record, nextRecords) {
-    if (!record.date || !record.odometer || !record.totalCost || !record.liters) {
-      return "请完整填写日期、里程、总花费和加油量。";
-    }
-
-    if (record.totalCost <= 0 || record.liters <= 0) {
-      return "总花费和加油量必须大于 0。";
-    }
-
-    return validateOdometer(nextRecords, record);
-  }
-
-  document.querySelector("[data-fuel-options]")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-fuel-type]");
-    if (!button) {
-      return;
-    }
-    selectedFuelType = button.dataset.fuelType;
-    setFuelButtons(selectedFuelType);
-  });
-
-  [totalCostInput, litersInput].forEach((field) => {
-    field?.addEventListener("input", updateUnitPrice);
-    field?.addEventListener("change", updateUnitPrice);
-  });
-
-  form?.addEventListener("submit", (event) => {
-    event.preventDefault();
-
-    const record = buildDraftRecord();
-    const nextRecords = editingRecord
-      ? records.map((item) => (item.id === editingRecord.id ? record : item))
-      : [record, ...records];
-    const error = validate(record, nextRecords);
-
-    if (error) {
-      window.alert(error);
-      return;
-    }
-
-    saveRecords(nextRecords);
-    window.location.href = editingRecord ? "./logs.html?flash=updated" : "./logs.html?flash=saved";
-  });
-
-  setFuelButtons(selectedFuelType);
-  updateUnitPrice();
-}
-
-function initStatsPage() {
-  const records = loadRecords();
-  const data = deriveData(records);
-  const now = new Date();
-  const daysElapsed = Math.max(1, now.getDate());
-  const monthlySpend = data.monthly.totalSpend;
-  const averageDaily = monthlySpend / daysElapsed;
-  const fuelShare = monthlySpend > 0 ? 100 : 0;
-
-  setText("statsMonthlySpend", formatNumber(monthlySpend, 2));
-  setText("statsDailyAverage", formatNumber(averageDaily, 2));
-  setText("statsMonthCompare", (() => {
-    if (!data.previousMonthly.totalSpend && !monthlySpend) {
-      return "0%";
-    }
-    if (!data.previousMonthly.totalSpend) {
-      return "+100%";
-    }
-    const diff = ((monthlySpend - data.previousMonthly.totalSpend) / data.previousMonthly.totalSpend) * 100;
-    const sign = diff > 0 ? "+" : "";
-    return `${sign}${formatNumber(diff, 0)}%`;
-  })());
-  setText("statsFuelShare", `${formatNumber(fuelShare, 0)}%`);
-  setText("statsFuelCount", `共计 ${data.monthly.count} 次`);
-  setText("statsFuelAmount", formatNumber(monthlySpend, 2));
-  setText("statsMaintenanceCount", "共计 0 次");
-  setText("statsMaintenanceAmount", "0.00");
-  setText("statsWashCount", "共计 0 次");
-  setText("statsWashAmount", "0.00");
-  setText("statsRepairCount", "共计 0 次");
-  setText("statsRepairAmount", "0.00");
-  setText("statsAccessoryCount", "暂无记录");
-  setText("statsAccessoryAmount", "0.00");
-  setText("statsDecorationCount", "共计 0 次");
-  setText("statsDecorationAmount", "0.00");
-
-  const primaryArc = document.getElementById("statsFuelArc");
-  const secondaryArc = document.getElementById("statsOtherArc");
-  if (primaryArc) {
-    const offset = DONUT_CIRCUMFERENCE * (1 - fuelShare / 100);
-    primaryArc.setAttribute("stroke-dasharray", String(DONUT_CIRCUMFERENCE));
-    primaryArc.setAttribute("stroke-dashoffset", String(offset));
-  }
-  if (secondaryArc) {
-    secondaryArc.setAttribute("stroke-dasharray", String(DONUT_CIRCUMFERENCE));
-    secondaryArc.setAttribute("stroke-dashoffset", String(DONUT_CIRCUMFERENCE));
-  }
-}
-
 function applyUnitToggleStyles(activeUnit) {
   document.querySelectorAll("[data-unit]").forEach((button) => {
     const isActive = button.dataset.unit === activeUnit;
@@ -658,120 +946,550 @@ function applyUnitToggleStyles(activeUnit) {
   });
 }
 
-function renderSettingsPage() {
-  const settings = loadSettings();
-  const records = loadRecords();
+function validateOdometerSequence(records, candidateRecord) {
+  const ordered = records
+    .filter((record) => record.vehicleId === candidateRecord.vehicleId && record.id !== candidateRecord.id && record.odometerKm > 0)
+    .concat(candidateRecord)
+    .sort(compareRecordsChronological);
 
-  setText("settingsCurrentCarName", settings.garage.current.name);
-  setText("settingsCurrentCarPlate", settings.garage.current.plate);
-  setText("settingsBackupCarName", settings.garage.backup.name);
-  setText("settingsBackupCarMileage", `${formatNumber(settings.garage.backup.mileageKm, 2)} KM`);
-  setText(
-    "settingsLastSync",
-    records[0] ? `最后同步: ${formatDateHeading(records[0].date)} ${formatTime(records[0].updatedAt || records[0].createdAt)}` : "最后同步: 暂无数据"
-  );
-  applyUnitToggleStyles(settings.unit);
+  const index = ordered.findIndex((record) => record.id === candidateRecord.id);
+  const previous = index > 0 ? ordered[index - 1] : null;
+  const next = index >= 0 && index < ordered.length - 1 ? ordered[index + 1] : null;
+
+  if (previous && candidateRecord.odometerKm < previous.odometerKm) {
+    return `当前里程不能小于上一条记录（${formatDateHeading(previous.date)}，${formatInteger(previous.odometerKm)} KM）`;
+  }
+
+  if (next && candidateRecord.odometerKm > next.odometerKm) {
+    return `当前里程不能大于下一条记录（${formatDateHeading(next.date)}，${formatInteger(next.odometerKm)} KM）`;
+  }
+
+  return "";
 }
 
-function initSettingsPage() {
-  const exportCard = document.getElementById("exportDataCard");
-  const backupCard = document.getElementById("backupRestoreCard");
-  const importInput = document.getElementById("backupImportInput");
-  const currentCard = document.getElementById("currentCarCard");
+function renderDashboardPage(snapshot) {
+  const activeVehicle = getActiveVehicle(snapshot);
+  if (!activeVehicle) {
+    return;
+  }
+
+  const unitMode = snapshot.settings.unit;
+  const analytics = getVehicleAnalytics(snapshot, activeVehicle.id);
+  const monthlySpend = sumAmounts(analytics.currentMonthRecords);
+  const previousMonthlySpend = sumAmounts(analytics.previousMonthRecords);
+  const monthlyDistance = getDistanceCoverage(analytics.currentMonthRecords);
+  const monthlyAvgEfficiency = averageEfficiency(analytics.currentFuelSeries);
+
+  setText("dashboardMonthlySpend", formatNumber(monthlySpend, 2));
+  setText("dashboardMonthlyDelta", getMonthDeltaLabel(monthlySpend, previousMonthlySpend));
+  setText("dashboardMonthlyMileage", formatDistanceValue(monthlyDistance, unitMode, 0));
+  setText("dashboardMileageUnit", formatDistanceUnit(unitMode));
+  setText("dashboardAvgEfficiency", formatCompactEfficiency(monthlyAvgEfficiency, unitMode));
+  setText("dashboardCurrentCarName", activeVehicle.name);
+}
+
+function buildEmptyHistoryMarkup() {
+  return `
+    <div class="group">
+      <div class="bg-surface-container rounded-lg p-6">
+        <p class="font-headline text-white font-bold text-lg">还没有记录</p>
+        <p class="font-body text-sm text-on-surface-variant mt-2">先去“记录”页添加第一条数据，趋势和历史会自动生成。</p>
+        <a class="inline-block mt-5 px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed font-bold text-sm" href="./add.html">去记录</a>
+      </div>
+    </div>
+  `;
+}
+
+function getHistoryCardMetrics(record, efficiencyByRecordId, unitMode) {
+  if (record.kind === "fuel") {
+    const payload = getFuelPayload(record);
+    return {
+      leftLabel: "油耗",
+      leftValue: formatDetailedEfficiency(efficiencyByRecordId.get(record.id) || 0, unitMode),
+      middleLabel: "当前里程",
+      middleValue: record.odometerKm > 0 ? `${formatDistanceValue(record.odometerKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
+      rightLabel: "加油量",
+      rightValue: `${formatNumber(payload.liters, 2)} L`,
+    };
+  }
+
+  return {
+    leftLabel: "记录类型",
+    leftValue: getCategoryLabel(record.kind),
+    middleLabel: "当前里程",
+    middleValue: record.odometerKm > 0 ? `${formatDistanceValue(record.odometerKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
+    rightLabel: "说明",
+    rightValue: record.title || "--",
+  };
+}
+
+function renderHistoryList(snapshot) {
+  const list = document.getElementById("historyList");
+  const activeVehicle = getActiveVehicle(snapshot);
+  if (!list || !activeVehicle) {
+    return;
+  }
+
+  const unitMode = snapshot.settings.unit;
+  const analytics = getVehicleAnalytics(snapshot, activeVehicle.id);
+  const vehicleMap = getVehicleMap(snapshot);
+
+  setText("logsTotalSpend", formatNumber(sumAmounts(analytics.allRecords), 2));
+
+  if (!analytics.allRecords.length) {
+    list.innerHTML = buildEmptyHistoryMarkup();
+    return;
+  }
+
+  list.innerHTML = analytics.allRecords
+    .map((record) => {
+      const vehicle = vehicleMap.get(record.vehicleId);
+      const metrics = getHistoryCardMetrics(record, analytics.efficiencyByRecordId, unitMode);
+      return `
+        <div class="group">
+          <div class="flex justify-between items-end mb-4">
+            <h2 class="font-headline text-on-surface font-medium text-[1.25rem]">${escapeHtml(formatDateHeading(record.date))}</h2>
+            <span class="font-label text-on-surface-variant text-[0.75rem] font-bold tracking-wider">${escapeHtml(formatTime(record.updatedAt || record.createdAt))}</span>
+          </div>
+          <button class="app-card-button bg-surface-container rounded-lg p-6 transition-all duration-300 active:scale-[0.98] active:bg-surface-container-high cursor-pointer" data-record-id="${escapeHtml(record.id)}" type="button">
+            <div class="flex justify-between items-start mb-6">
+              <div>
+                <p class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-tighter mb-1">记录车辆</p>
+                <p class="font-headline text-white font-bold text-lg">${escapeHtml(vehicle?.plate || vehicle?.name || "未命名车辆")}</p>
+              </div>
+              <div class="text-right">
+                <p class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-tighter mb-1">实付金额</p>
+                <p class="font-headline text-primary-fixed font-bold text-xl">${escapeHtml(formatNumber(record.amount, 2))}</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 pt-4 border-t border-outline-variant/10">
+              <div>
+                <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">${escapeHtml(metrics.leftLabel)}</p>
+                <p class="font-headline text-white text-[0.9rem] font-medium">${escapeHtml(metrics.leftValue)}</p>
+              </div>
+              <div>
+                <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">${escapeHtml(metrics.middleLabel)}</p>
+                <p class="font-headline text-white text-[0.9rem] font-medium">${escapeHtml(metrics.middleValue)}</p>
+              </div>
+              <div class="text-right">
+                <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">${escapeHtml(metrics.rightLabel)}</p>
+                <p class="font-headline text-white text-[0.9rem] font-medium">${escapeHtml(metrics.rightValue)}</p>
+              </div>
+            </div>
+          </button>
+        </div>
+      `;
+    })
+    .join("");
+
+  const recordMap = new Map(analytics.allRecords.map((record) => [record.id, record]));
+  list.querySelectorAll("[data-record-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const record = recordMap.get(button.dataset.recordId || "");
+      if (!record) {
+        return;
+      }
+
+      if (record.kind !== "fuel") {
+        showToast(DEFAULT_GENERIC_EDIT_MESSAGE);
+        return;
+      }
+
+      window.location.href = `./add.html?id=${encodeURIComponent(record.id)}`;
+    });
+  });
+}
+
+function renderStatsPage(snapshot) {
+  const activeVehicle = getActiveVehicle(snapshot);
+  if (!activeVehicle) {
+    return;
+  }
+
+  const analytics = getVehicleAnalytics(snapshot, activeVehicle.id);
+  const currentMonthRecords = analytics.currentMonthRecords;
+  const previousMonthRecords = analytics.previousMonthRecords;
+  const monthlySpend = sumAmounts(currentMonthRecords);
+  const previousMonthlySpend = sumAmounts(previousMonthRecords);
+  const daysElapsed = Math.max(1, new Date().getDate());
+  const dailyAverage = monthlySpend / daysElapsed;
+  const summaryByKind = summarizeByKind(currentMonthRecords);
+  const fuelShare = monthlySpend > 0 ? (summaryByKind.fuel.amount / monthlySpend) * 100 : 0;
+  const otherShare = Math.max(0, 100 - fuelShare);
+  const compare = getMonthCompareValue(monthlySpend, previousMonthlySpend);
+
+  setText("statsMonthlySpend", formatNumber(monthlySpend, 2));
+  setText("statsDailyAverage", formatNumber(dailyAverage, 2));
+  setText("statsMonthCompare", compare.text);
+  setText("statsFuelShare", `${formatNumber(fuelShare, 0)}%`);
+
+  const monthCompareElement = document.getElementById("statsMonthCompare");
+  if (monthCompareElement) {
+    monthCompareElement.classList.toggle("text-error", compare.diff > 0);
+    monthCompareElement.classList.toggle("text-primary-fixed", compare.diff < 0);
+  }
+
+  CATEGORY_ORDER.forEach((kind) => {
+    const summary = summaryByKind[kind];
+    const suffix = kind.charAt(0).toUpperCase() + kind.slice(1);
+    setText(`stats${suffix}Count`, getCategoryCountLabel(summary.count));
+    setText(`stats${suffix}Amount`, formatNumber(summary.amount, 2));
+  });
+
+  const fuelArc = document.getElementById("statsFuelArc");
+  if (fuelArc) {
+    fuelArc.setAttribute("stroke-dasharray", `${(DONUT_CIRCUMFERENCE * fuelShare) / 100} ${DONUT_CIRCUMFERENCE}`);
+    fuelArc.setAttribute("stroke-dashoffset", "0");
+  }
+
+  const otherArc = document.getElementById("statsOtherArc");
+  if (otherArc) {
+    otherArc.setAttribute("stroke-dasharray", `${(DONUT_CIRCUMFERENCE * otherShare) / 100} ${DONUT_CIRCUMFERENCE}`);
+    otherArc.setAttribute("stroke-dashoffset", `${-(DONUT_CIRCUMFERENCE * fuelShare) / 100}`);
+  }
+}
+
+function renderSettingsPage(snapshot) {
+  const activeVehicle = getActiveVehicle(snapshot);
+  const secondaryVehicle = getSecondaryVehicle(snapshot);
+
+  if (activeVehicle) {
+    setText("settingsCurrentCarName", activeVehicle.name);
+    setText("settingsCurrentCarPlate", activeVehicle.plate || "未设置牌照");
+  }
+
+  if (secondaryVehicle) {
+    setText("settingsBackupCarName", secondaryVehicle.name);
+    setText("settingsBackupCarMileage", `${formatNumber(secondaryVehicle.mileageKm, 1)} KM`);
+  } else {
+    setText("settingsBackupCarName", "添加备用车");
+    setText("settingsBackupCarMileage", "点击创建");
+  }
+
+  applyUnitToggleStyles(snapshot.settings.unit);
+
+  const latestRecord = snapshot.records.sort(compareRecordsDesc)[0];
+  setText(
+    "settingsLastSync",
+    latestRecord ? `最后同步：${formatDateHeading(latestRecord.date)} ${formatTime(latestRecord.updatedAt || latestRecord.createdAt)}` : "最后同步：暂无数据"
+  );
+}
+
+function promptVehicleFields(initialVehicle = {}, options = {}) {
+  const nextName = window.prompt(options.nameLabel || "输入车辆名称", initialVehicle.name || "");
+  if (nextName === null) {
+    return null;
+  }
+
+  const nextPlate = window.prompt(options.plateLabel || "输入车辆牌照", initialVehicle.plate || "");
+  if (nextPlate === null) {
+    return null;
+  }
+
+  const needsMileage = options.includeMileage !== false;
+  let nextMileage = initialVehicle.mileageKm || 0;
+
+  if (needsMileage) {
+    const rawMileage = window.prompt(options.mileageLabel || "输入当前里程（KM）", String(initialVehicle.mileageKm || 0));
+    if (rawMileage === null) {
+      return null;
+    }
+    nextMileage = Math.max(0, asNumber(rawMileage));
+  }
+
+  return {
+    name: nextName.trim() || initialVehicle.name || "未命名车辆",
+    plate: nextPlate.trim() || initialVehicle.plate || "",
+    mileageKm: nextMileage,
+  };
+}
+
+async function initAddPage(snapshot) {
+  const params = new URLSearchParams(window.location.search);
+  const editingId = params.get("id");
+  const activeVehicle = getActiveVehicle(snapshot);
+  const form = document.getElementById("recordForm");
+  const dateInput = document.getElementById("recordDate");
+  const odometerInput = document.getElementById("recordOdometer");
+  const totalCostInput = document.getElementById("recordTotalCost");
+  const litersInput = document.getElementById("recordLiters");
+  const fullTankInput = document.getElementById("recordFullTank");
+  const pageHeading = document.getElementById("addPageHeading");
+  const pageTitle = document.getElementById("addPageTitle");
+  let editingRecord = snapshot.records.find((record) => record.id === editingId) || null;
+
+  if (editingRecord && editingRecord.kind !== "fuel") {
+    showToast(DEFAULT_GENERIC_EDIT_MESSAGE);
+    window.setTimeout(() => {
+      window.location.href = "./logs.html";
+    }, 300);
+    return;
+  }
+
+  let selectedFuelType = editingRecord ? getFuelPayload(editingRecord).fuelType : "95#";
+
+  if (pageHeading) {
+    pageHeading.textContent = editingRecord ? "编辑本次旅程" : "记录本次旅程";
+  }
+
+  if (pageTitle) {
+    pageTitle.textContent = editingRecord ? "编辑记录" : "记录";
+  }
+
+  if (dateInput) {
+    dateInput.value = editingRecord?.date || getToday();
+  }
+
+  if (odometerInput) {
+    odometerInput.value = editingRecord?.odometerKm || "";
+  }
+
+  if (totalCostInput) {
+    totalCostInput.value = editingRecord?.amount || "";
+  }
+
+  if (litersInput) {
+    litersInput.value = editingRecord ? getFuelPayload(editingRecord).liters || "" : "";
+  }
+
+  if (fullTankInput) {
+    fullTankInput.checked = editingRecord ? getFuelPayload(editingRecord).isFullTank : true;
+  }
+
+  function updateUnitPrice() {
+    const totalCost = asNumber(totalCostInput?.value);
+    const liters = asNumber(litersInput?.value);
+    setText("recordUnitPriceDisplay", liters > 0 ? formatNumber(totalCost / liters, 2) : "0.00");
+  }
+
+  function buildDraftRecord() {
+    const totalCost = asNumber(totalCostInput?.value);
+    const liters = asNumber(litersInput?.value);
+    const createdAt = editingRecord?.createdAt || nowIso();
+
+    return normalizeRecord({
+      id: editingRecord?.id,
+      vehicleId: editingRecord?.vehicleId || activeVehicle?.id || "",
+      kind: "fuel",
+      date: dateInput?.value || getToday(),
+      amount: totalCost,
+      odometerKm: asNumber(odometerInput?.value),
+      title: `${selectedFuelType} 汽油`,
+      note: editingRecord?.note || "",
+      createdAt,
+      updatedAt: nowIso(),
+      payload: {
+        liters,
+        fuelType: selectedFuelType,
+        isFullTank: Boolean(fullTankInput?.checked),
+        unitPrice: liters > 0 ? totalCost / liters : 0,
+      },
+    });
+  }
+
+  function validate(record, records) {
+    if (!record.date || record.odometerKm <= 0 || record.amount <= 0 || getFuelPayload(record).liters <= 0) {
+      return "请完整填写日期、里程、总花费和加油量";
+    }
+
+    return validateOdometerSequence(records, record);
+  }
+
+  document.querySelector("[data-fuel-options]")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-fuel-type]");
+    if (!button) {
+      return;
+    }
+    selectedFuelType = button.dataset.fuelType || "95#";
+    setFuelButtons(selectedFuelType);
+  });
+
+  [totalCostInput, litersInput].forEach((input) => {
+    input?.addEventListener("input", updateUnitPrice);
+    input?.addEventListener("change", updateUnitPrice);
+  });
+
+  form?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const nextSnapshot = await loadSnapshot();
+    const draftRecord = buildDraftRecord();
+    const error = validate(draftRecord, nextSnapshot.records);
+
+    if (error) {
+      showToast(error, "warning");
+      return;
+    }
+
+    nextSnapshot.records = nextSnapshot.records.filter((record) => record.id !== draftRecord.id).concat(draftRecord);
+    const vehicle = nextSnapshot.vehicles.find((item) => item.id === draftRecord.vehicleId);
+    if (vehicle) {
+      vehicle.updatedAt = nowIso();
+      vehicle.mileageKm = Math.max(vehicle.mileageKm, draftRecord.odometerKm);
+    }
+
+    await saveSnapshot(nextSnapshot);
+    window.location.href = editingRecord ? "./logs.html?flash=updated" : "./logs.html?flash=saved";
+  });
+
+  setFuelButtons(selectedFuelType);
+  updateUnitPrice();
+}
+
+async function initSettingsPage(snapshot) {
+  const unitGroup = document.querySelector("[data-unit-group]");
+  const currentCarCard = document.getElementById("currentCarCard");
   const backupCarCard = document.getElementById("backupCarCard");
   const addCarCard = document.getElementById("addCarCard");
+  const exportDataCard = document.getElementById("exportDataCard");
+  const backupRestoreCard = document.getElementById("backupRestoreCard");
+  const backupImportInput = document.getElementById("backupImportInput");
   const darkModeToggle = document.getElementById("darkModeToggle");
   const themeSwitchButton = document.getElementById("themeSwitchButton");
+  const gatedIds = ["maintenanceModuleCard", "washModuleCard", "repairModuleCard", "partsModuleCard"];
 
-  renderSettingsPage();
+  renderSettingsPage(snapshot);
 
-  document.querySelector("[data-unit-group]")?.addEventListener("click", (event) => {
+  unitGroup?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-unit]");
     if (!button) {
       return;
     }
 
-    const settings = loadSettings();
-    settings.unit = button.dataset.unit === "imperial" ? "imperial" : "metric";
-    saveSettings(settings);
-    renderSettingsPage();
+    const nextSnapshot = await loadSnapshot();
+    nextSnapshot.settings = normalizeSettings({
+      ...nextSnapshot.settings,
+      unit: button.dataset.unit === "imperial" ? "imperial" : "metric",
+      updatedAt: nowIso(),
+    });
+    await saveSnapshot(nextSnapshot);
+    renderSettingsPage(await loadSnapshot());
   });
 
-  currentCard?.addEventListener("click", () => {
-    const settings = loadSettings();
-    const nextName = window.prompt("编辑当前车辆名称", settings.garage.current.name);
-    if (nextName === null) {
-      return;
-    }
-    const nextPlate = window.prompt("编辑当前车辆牌照", settings.garage.current.plate);
-    if (nextPlate === null) {
-      return;
-    }
-    settings.garage.current.name = nextName.trim() || DEFAULT_SETTINGS.garage.current.name;
-    settings.garage.current.plate = nextPlate.trim() || DEFAULT_SETTINGS.garage.current.plate;
-    saveSettings(settings);
-    renderSettingsPage();
-  });
-
-  backupCarCard?.addEventListener("click", () => {
-    const settings = loadSettings();
-    const nextName = window.prompt("编辑备用车辆名称", settings.garage.backup.name);
-    if (nextName === null) {
-      return;
-    }
-    const nextMileage = window.prompt("编辑备用车辆当前里程（KM）", String(settings.garage.backup.mileageKm));
-    if (nextMileage === null) {
-      return;
-    }
-    settings.garage.backup.name = nextName.trim() || DEFAULT_SETTINGS.garage.backup.name;
-    settings.garage.backup.mileageKm = Math.max(0, asNumber(nextMileage));
-    saveSettings(settings);
-    renderSettingsPage();
-  });
-
-  addCarCard?.addEventListener("click", () => {
-    const settings = loadSettings();
-    const nextName = window.prompt("添加或替换备用车辆名称", settings.garage.backup.name || "");
-    if (nextName === null) {
-      return;
-    }
-    const nextMileage = window.prompt("输入备用车辆当前里程（KM）", String(settings.garage.backup.mileageKm || 0));
-    if (nextMileage === null) {
-      return;
-    }
-    settings.garage.backup = {
-      name: nextName.trim() || DEFAULT_SETTINGS.garage.backup.name,
-      mileageKm: Math.max(0, asNumber(nextMileage)),
-    };
-    saveSettings(settings);
-    renderSettingsPage();
-  });
-
-  exportCard?.addEventListener("click", () => {
-    const records = loadRecords();
-    if (window.confirm("点击“确定”导出 CSV 报告，点击“取消”导出 JSON 报告。")) {
-      downloadFile("jiageyouba-report.csv", toCsv(records), "text/csv;charset=utf-8");
+  currentCarCard?.addEventListener("click", async () => {
+    const nextSnapshot = await loadSnapshot();
+    const activeVehicle = getActiveVehicle(nextSnapshot);
+    if (!activeVehicle) {
       return;
     }
 
-    downloadFile(
-      "jiageyouba-report.json",
-      JSON.stringify(
-        {
-          exportedAt: new Date().toISOString(),
-          settings: loadSettings(),
-          records,
-        },
-        null,
-        2
-      ),
-      "application/json;charset=utf-8"
+    const fields = promptVehicleFields(activeVehicle, {
+      includeMileage: false,
+      nameLabel: "编辑当前车辆名称",
+      plateLabel: "编辑当前车辆牌照",
+    });
+    if (!fields) {
+      return;
+    }
+
+    nextSnapshot.vehicles = nextSnapshot.vehicles.map((vehicle) =>
+      vehicle.id === activeVehicle.id
+        ? normalizeVehicle({
+            ...vehicle,
+            ...fields,
+            updatedAt: nowIso(),
+          })
+        : vehicle
     );
+
+    await saveSnapshot(nextSnapshot);
+    renderSettingsPage(await loadSnapshot());
+    showToast("当前车辆信息已更新");
   });
 
-  backupCard?.addEventListener("click", () => {
-    if (window.confirm("点击“确定”选择 JSON 备份文件导入，点击“取消”导出当前 JSON 备份。")) {
-      importInput?.click();
+  backupCarCard?.addEventListener("click", async () => {
+    const nextSnapshot = await loadSnapshot();
+    const secondaryVehicle = getSecondaryVehicle(nextSnapshot);
+    if (!secondaryVehicle) {
+      showToast("还没有备用车，先点击“添加新成员”");
+      return;
+    }
+
+    const shouldSwitch = window.confirm(`将 ${secondaryVehicle.name} 设为当前驾驶？\n点击“取消”继续编辑这辆车的信息。`);
+    if (shouldSwitch) {
+      nextSnapshot.settings = normalizeSettings({
+        ...nextSnapshot.settings,
+        activeVehicleId: secondaryVehicle.id,
+        updatedAt: nowIso(),
+      });
+      await saveSnapshot(nextSnapshot);
+      renderSettingsPage(await loadSnapshot());
+      showToast(FLASH_MESSAGES.vehicleSwitched);
+      return;
+    }
+
+    const fields = promptVehicleFields(secondaryVehicle, {
+      includeMileage: true,
+      nameLabel: "编辑备用车辆名称",
+      plateLabel: "编辑备用车辆牌照",
+      mileageLabel: "编辑备用车辆当前里程（KM）",
+    });
+    if (!fields) {
+      return;
+    }
+
+    nextSnapshot.vehicles = nextSnapshot.vehicles.map((vehicle) =>
+      vehicle.id === secondaryVehicle.id
+        ? normalizeVehicle({
+            ...vehicle,
+            ...fields,
+            updatedAt: nowIso(),
+          })
+        : vehicle
+    );
+
+    await saveSnapshot(nextSnapshot);
+    renderSettingsPage(await loadSnapshot());
+    showToast("备用车辆信息已更新");
+  });
+
+  addCarCard?.addEventListener("click", async () => {
+    const nextSnapshot = await loadSnapshot();
+    const fields = promptVehicleFields(
+      {
+        name: "",
+        plate: "",
+        mileageKm: 0,
+      },
+      {
+        includeMileage: true,
+        nameLabel: "输入新车辆名称",
+        plateLabel: "输入新车辆牌照",
+        mileageLabel: "输入新车辆当前里程（KM）",
+      }
+    );
+
+    if (!fields) {
+      return;
+    }
+
+    const createdAt = nowIso();
+    const newVehicle = normalizeVehicle({
+      ...fields,
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    nextSnapshot.vehicles = [newVehicle, ...nextSnapshot.vehicles];
+
+    if (window.confirm(`将 ${newVehicle.name} 设为当前驾驶？`)) {
+      nextSnapshot.settings = normalizeSettings({
+        ...nextSnapshot.settings,
+        activeVehicleId: newVehicle.id,
+        updatedAt: nowIso(),
+      });
+    }
+
+    await saveSnapshot(nextSnapshot);
+    renderSettingsPage(await loadSnapshot());
+    showToast("车辆已加入车库");
+  });
+
+  exportDataCard?.addEventListener("click", async () => {
+    const nextSnapshot = await loadSnapshot();
+    if (window.confirm("点击“确定”导出 CSV 报告，点击“取消”导出完整 JSON 数据。")) {
+      downloadFile("jiageyouba-report.csv", toCsv(nextSnapshot), "text/csv;charset=utf-8");
+      showToast("CSV 报告已导出");
       return;
     }
 
@@ -779,70 +1497,107 @@ function initSettingsPage() {
       "jiageyouba-backup.json",
       JSON.stringify(
         {
-          exportedAt: new Date().toISOString(),
-          settings: loadSettings(),
-          records: loadRecords(),
+          exportedAt: nowIso(),
+          settings: nextSnapshot.settings,
+          vehicles: nextSnapshot.vehicles,
+          stations: nextSnapshot.stations,
+          records: nextSnapshot.records,
         },
         null,
         2
       ),
       "application/json;charset=utf-8"
     );
+    showToast("JSON 备份已导出");
   });
 
-  importInput?.addEventListener("change", async () => {
-    const file = importInput.files?.[0];
+  backupRestoreCard?.addEventListener("click", async () => {
+    if (window.confirm("点击“确定”选择 JSON 备份导入，点击“取消”导出当前完整备份。")) {
+      backupImportInput?.click();
+      return;
+    }
+
+    const nextSnapshot = await loadSnapshot();
+    downloadFile(
+      "jiageyouba-backup.json",
+      JSON.stringify(
+        {
+          exportedAt: nowIso(),
+          settings: nextSnapshot.settings,
+          vehicles: nextSnapshot.vehicles,
+          stations: nextSnapshot.stations,
+          records: nextSnapshot.records,
+        },
+        null,
+        2
+      ),
+      "application/json;charset=utf-8"
+    );
+    showToast("完整备份已导出");
+  });
+
+  backupImportInput?.addEventListener("change", async () => {
+    const file = backupImportInput.files?.[0];
     if (!file) {
       return;
     }
 
     try {
-      const payload = JSON.parse(await file.text());
-      saveSettings({
-        ...loadSettings(),
-        ...(payload.settings || {}),
-      });
-      saveRecords(Array.isArray(payload.records) ? payload.records.map(normalizeRecord) : []);
+      const imported = normalizeImportedSnapshot(JSON.parse(await file.text()));
+      await saveSnapshot(imported, [{ key: "lastImportedAt", value: nowIso() }]);
       window.location.href = "./settings.html?flash=imported";
-    } catch {
-      window.alert("导入失败，请检查 JSON 备份文件。");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "导入失败，请检查备份文件", "warning");
     } finally {
-      importInput.value = "";
+      backupImportInput.value = "";
     }
   });
 
-  darkModeToggle?.addEventListener("click", () => {
-    window.alert("当前版本已固定为深色视觉，后续如需浅色版，建议单独设计一套主题。");
+  [darkModeToggle, themeSwitchButton].forEach((button) => {
+    button?.addEventListener("click", () => {
+      showToast(DEFAULT_THEME_MESSAGE);
+    });
   });
 
-  themeSwitchButton?.addEventListener("click", () => {
-    window.alert("当前版本已固定为深色视觉，后续如需浅色版，建议单独设计一套主题。");
+  gatedIds.forEach((id) => {
+    document.getElementById(id)?.addEventListener("click", () => {
+      showToast(DEFAULT_MODULE_MESSAGE);
+    });
   });
 }
 
-function initPage() {
+async function initPage() {
   registerServiceWorker();
+  await bootstrapDatabase();
+  bindThemeEntryPoints();
   showFlash();
+
+  const snapshot = await loadSnapshot();
 
   switch (document.body.dataset.page) {
     case "dashboard":
-      initDashboardPage();
+      renderDashboardPage(snapshot);
       break;
     case "add":
-      initAddPage();
+      await initAddPage(snapshot);
       break;
     case "stats":
-      initStatsPage();
+      renderStatsPage(snapshot);
       break;
     case "logs":
-      renderHistoryList();
+      renderHistoryList(snapshot);
       break;
     case "settings":
-      initSettingsPage();
+      await initSettingsPage(snapshot);
       break;
     default:
       break;
   }
 }
 
-initPage();
+document.addEventListener("DOMContentLoaded", () => {
+  void initPage().catch((error) => {
+    console.error(error);
+    showToast("应用初始化失败，请刷新重试", "warning");
+  });
+});
