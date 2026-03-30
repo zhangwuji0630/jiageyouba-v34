@@ -131,7 +131,7 @@ body {
 }
 
 .app-dashboard-story-quote {
-  color: #ffffff !important;
+  color: rgba(255, 255, 255, 0.8) !important;
 }
 
 .app-nav-link {
