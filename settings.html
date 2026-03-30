@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>设置 - 加油记录 V3.5.3</title>
+  <title>设置 - 加油记录 V3.6.0</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -112,7 +112,7 @@
     <section>
       <div class="flex justify-between items-end mb-6">
         <h2 class="font-headline font-medium text-[1.75rem] text-on-surface">我的车库</h2>
-        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.5.3</span>
+        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.6.0</span>
       </div>
       <div class="grid grid-cols-2 gap-4">
         <div class="col-span-2 bg-surface-container rounded-lg p-6 relative overflow-hidden group cursor-pointer" id="currentCarCard">
@@ -192,12 +192,46 @@
             </div>
             <div>
               <p class="text-on-surface font-headline font-medium">备份与恢复</p>
-              <p class="text-on-surface-variant text-xs font-thin mt-1" id="settingsLastSync">最后同步: 2023.10.24 14:30</p>
+              <p class="text-on-surface-variant text-xs font-thin mt-1" id="settingsLastSync">最后同步：2023.10.24 14:30</p>
             </div>
           </div>
           <span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="chevron_right">chevron_right</span>
         </div>
         <input accept="application/json" hidden id="backupImportInput" type="file"/>
+      </div>
+    </section>
+    <section>
+      <div class="flex justify-between items-end mb-6">
+        <h2 class="font-headline font-medium text-[1.75rem] text-on-surface">云同步</h2>
+        <span class="font-label text-xs text-secondary tracking-widest">SUPABASE</span>
+      </div>
+      <div class="bg-surface-container rounded-lg p-6 space-y-5">
+        <div class="flex items-start gap-5">
+          <div class="w-12 h-12 rounded-full bg-primary-fixed/10 flex items-center justify-center">
+            <span class="material-symbols-outlined text-primary-fixed" data-icon="cloud_sync">cloud_sync</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-on-surface font-headline font-medium" id="cloudAuthStatus">未登录云同步</p>
+            <p class="text-on-surface-variant text-xs font-thin mt-1" id="cloudAuthHint">登录后可在重装 PWA 后恢复车辆与记录</p>
+            <p class="text-on-surface-variant text-[11px] font-thin mt-2" id="cloudLastSyncStatus">最近云同步：未开始</p>
+          </div>
+        </div>
+        <div class="grid gap-3">
+          <label class="app-field">
+            <span class="app-field__label">邮箱</span>
+            <input autocomplete="email" class="app-input" id="cloudEmail" placeholder="输入登录邮箱" type="email"/>
+          </label>
+          <label class="app-field">
+            <span class="app-field__label">密码</span>
+            <input autocomplete="current-password" class="app-input" id="cloudPassword" placeholder="输入登录密码" type="password"/>
+          </label>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <button class="app-action-button" id="cloudSignUpButton" type="button">注册账号</button>
+          <button class="app-action-button" id="cloudSignInButton" type="button">登录同步</button>
+          <button class="app-secondary-button" id="cloudSyncButton" type="button">立即同步</button>
+          <button class="app-secondary-button" id="cloudSignOutButton" type="button">退出登录</button>
+        </div>
       </div>
     </section>
     <section>
@@ -256,6 +290,7 @@
       </a>
     </div>
   </nav>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="./app.js"></script>
 </body>
 </html>

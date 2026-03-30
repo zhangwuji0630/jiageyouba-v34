@@ -1,33 +1,28 @@
-# 加油记录 V3.5.3
+# 加油记录 V3.6.0
 
-一个基于 5 个移动端页面组合而成的静态 PWA：
+一个由 5 个移动端页面组成的静态 PWA：
 
-- `index.html` 看板
-- `add.html` 记录
-- `stats.html` 趋势
-- `logs.html` 历史
-- `settings.html` 设置
+- `index.html`：看板
+- `add.html`：记录
+- `stats.html`：趋势
+- `logs.html`：历史
+- `settings.html`：设置
 
-## 在线地址
+在线地址：
 
-- GitHub Pages: `https://zhangwuji0630.github.io/jiageyouba-v34/`
+- GitHub Pages：`https://zhangwuji0630.github.io/jiageyouba-v34/`
 
 ## 当前状态
 
-- 已发布并可安装为 PWA
-- GitHub Pages 当前发布版本为 `V3.5.3`
-- 5 页底部导航已全部接通
-- 数据层已从 `localStorage` 重构为 `IndexedDB`
-- 已支持旧版本地数据自动迁移
-- 已支持 `settings / vehicles / records / stations` 四类基础模型
-- 已接通加油记录的新增与编辑
-- 已接通非加油类记录的新增与编辑
-- 设置页的保养 / 洗车 / 维修 / 配件模块入口已接到录入页
-- 看板 / 趋势 / 历史 / 设置 已接到真实数据
-- 已支持深色 / 浅色 / 跟随系统三种主题模式
-- 已完成 5 页顶部间距收紧与看板模块顺序调整
-- 每页底部文案已支持切页和刷新随机切换
+- 已支持安装为 PWA
+- 已完成 `IndexedDB` 本地数据层
+- 已支持 `settings / vehicles / stations / records` 四类基础模型
+- 已接通加油记录与非加油类记录的新增、编辑与历史展示
+- 已支持深色、浅色、跟随系统三套主题模式
 - 已支持 CSV 导出、JSON 备份、JSON 导入恢复
+- 已加入 Supabase 登录与云同步入口
+- 已补充 `supabase/setup.sql`，用于创建云端快照表与 RLS 策略
+- 已修复静态 HTML 可见中文的编码风险，并统一版本到 `V3.6.0`
 
 ## 数据模型
 
@@ -39,6 +34,10 @@
   - 车辆名称
   - 牌照
   - 里程
+- `stations`
+  - 站点名称
+  - 城市
+  - 品牌
 - `records`
   - `fuel`
   - `maintenance`
@@ -46,75 +45,65 @@
   - `repair`
   - `accessory`
   - `decoration`
-- `stations`
-  - 加油站基础信息预留
 
-## 最新进度
+## 云同步方案
 
-### 2026-03-30
+当前版本采用“本地优先 + 登录后云端快照同步”：
 
-- 完成独立仓库 `jiageyouba-v34` 的线上发布与本地对齐
-- 完成 PWA 壳接线与 `service-worker` 缓存更新
-- 完成 `IndexedDB` 数据层落地与旧数据迁移
-- 完成 5 页主要交互接线
-- 完成 README 重写与 UTF-8 编码约束
-- 新增 `.editorconfig` 与 `.gitattributes`，锁定文本文件为 UTF-8
+- 本地仍以 `IndexedDB` 为主
+- 登录后会将整份快照同步到 Supabase `public.user_snapshots`
+- 删除桌面 PWA 后，只要重新安装并登录同一账号，即可从云端恢复
 
-### 2026-03-30（V3.5）
+前端固定配置：
 
-- 完成 `V3.5` 页面版本升级与线上部署
-- 完成非加油类记录录入与编辑流接入
-- 完成设置页模块卡到录入页的真实跳转
-- 完成历史页非加油记录编辑跳转
-- 完成浅色主题、深色主题、跟随系统主题接入
-- 完成主题持久化与 `theme-color` 联动
-- 完成看板第二模块下移到底部
-- 完成 5 页顶部留白收紧
-- 完成 5 页底部随机文案轮换
-- 完成本地静态 HTTP smoke test 与线上 Pages 回查
+- `Project URL`：`https://akjryomhmjdttxnevzxz.supabase.co`
+- `Publishable key`：已写入前端静态配置
 
-### 2026-03-30（V3.5.1）
+注意：
 
-- 完成看板图片文案卡位置回调到里程/油耗卡片下方
-- 完成看板图片文案卡层级修正：小字显示当前车辆名，主文案恢复为看板随机文案
-- 完成看板图片文案字号上调一档，保留原有视觉风格
-- 完成 `service-worker` 缓存版本升级，确保 `V3.5.1` 壳资源刷新
-- 完成 `app.js` UTF-8 BOM 兼容增强，降低 Windows 工具链误判中文编码的概率
-- 完成 CSV 导出 BOM 兼容，提升中文在 Excel 中的打开稳定性
-- 完成车辆管理上限保护，避免写入设置页无法管理的第 3 辆及以上车辆
-- 完成浅色主题 warning toast 对比度修正
+- 公开仓库里只能放 `publishable key`
+- 绝不能提交 `service_role` 或 `secret key`
 
-### 2026-03-30（V3.5.2）
+## Supabase 初始化
 
-- 恢复看板页页面最底部的独立随机文案区
-- 保持看板图片文案卡位于里程/油耗卡片下方
-- 保持图片文案卡上方小字为当前主车车名，并随主车切换/改名联动
-- 将图片文案卡主文案字号回调到 `V3.5` 的层级
-- 将图片文案卡主文案颜色回调为上一版的柔和浅色而非纯白
-- 完成 `service-worker` 缓存键升级，确保 `V3.5.2` 页面壳刷新
+1. 在 Supabase 控制台创建项目
+2. 开启 `Authentication > Sign In / Providers > Email`
+3. 在 `Authentication > URL Configuration` 中配置：
+   - `Site URL`：`https://zhangwuji0630.github.io/jiageyouba-v34/`
+   - `Redirect URLs`：
+     - `https://zhangwuji0630.github.io/jiageyouba-v34/`
+     - `https://zhangwuji0630.github.io/jiageyouba-v34/**`
+4. 打开 SQL Editor，执行 `supabase/setup.sql`
 
-### 2026-03-30（V3.5.3）
+## 版本规则
 
-- 固定看板图片文案卡为彩色图，不再在灰度和彩色之间切换
-- 移除看板图片文案卡中的车名小字
-- 将看板图片文案卡主文案字号继续回调，并限制为单行显示
-- 将趋势页文案卡主文案回调为更紧凑字号，并限制为单行显示
-- 缩短看板页与趋势页随机文案池，减少长句换行与截断概率
-- 完成 `service-worker` 缓存键升级，确保 `V3.5.3` 页面壳刷新
+- `x.y.z`：小修复、布局调整、文案修正、缓存更新，不改数据结构
+- `x.y`：新增功能、流程、同步能力或页面级能力
+- `x`：数据结构、存储格式或整体架构变更
 
-## 已知范围
+每次发布至少同步更新：
 
-- 当前 UI 保持 `V3.x` 既有视觉语言，不主动重做设计
-- 当前不做登录注册
-- 当前不做云同步
-- 当前不做站点信息录入与筛选
-- 当前未接入地图、定位、导航能力
-- 本地已做静态预览检查，但仍建议在真实手机端继续补一轮交互回归
+- 页面 `<title>`
+- 设置页可见版本标识
+- `manifest.webmanifest`
+- `README.md`
+- `service-worker.js` 缓存键
 
-## 下一步建议
+## 本次版本
 
-1. 增加站点信息录入与按站点/品牌筛选
-2. 为历史和趋势页增加更多筛选维度
-3. 补充非加油记录的更细字段，例如店铺、项目明细、图片附件
-4. 增加跨车辆聚合统计能力
-5. 视需求再决定是否引入账号体系和云同步
+### 2026-03-31 · V3.6.0
+
+- 新增 Supabase 登录与云同步入口
+- 新增 `public.user_snapshots` 快照表方案
+- 增加本地自动同步与手动同步逻辑
+- 修复 5 个静态 HTML 页面可见中文编码风险
+- 新增 `supabase/setup.sql`
+- 升级 `service-worker` 缓存版本
+
+## 后续建议
+
+1. 增加“同步冲突处理”与“最后恢复来源”提示
+2. 增加站点信息录入与筛选
+3. 为历史与趋势页增加更多筛选维度
+4. 增加图片附件、店铺、项目明细等扩展字段
+5. 后续如需要，再引入真正的多账号共享或团队能力

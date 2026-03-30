@@ -23,6 +23,31 @@ const DONUT_CIRCUMFERENCE = 251.2;
 const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
+const APP_VERSION = "3.6.0";
+const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
+const SUPABASE_REDIRECT_URL = "https://zhangwuji0630.github.io/jiageyouba-v34/settings.html";
+const CLOUD_TABLE = "user_snapshots";
+const CLOUD_SYNC_DEBOUNCE_MS = 500;
+
+const DEFAULT_VEHICLE_TEMPLATES = Object.freeze([
+  {
+    name: "保时捷 911 GT3",
+    plate: "沪A · 911GT3",
+    mileageKm: 12450,
+  },
+  {
+    name: "路虎 卫士 110",
+    plate: "",
+    mileageKm: 4500.5,
+  },
+]);
+
+const CLOUD_META_KEYS = Object.freeze({
+  lastSyncedAt: "cloudLastSyncedAt",
+  remoteUpdatedAt: "cloudLastRemoteUpdatedAt",
+  userId: "cloudUserId",
+});
 
 const CATEGORY_META = Object.freeze({
   fuel: { label: "加油" },
@@ -147,6 +172,16 @@ const FLASH_MESSAGES = Object.freeze({
 let databasePromise = null;
 let toastTimer = 0;
 let systemThemeWatcherBound = false;
+let cloudSyncTimer = 0;
+
+const cloudState = {
+  client: null,
+  session: null,
+  user: null,
+  authBound: false,
+  syncInFlight: false,
+  syncQueued: false,
+};
 
 function createId(prefix = "id") {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -373,19 +408,16 @@ function normalizeRecord(raw = {}) {
 
 function createDefaultSnapshot() {
   const createdAt = nowIso();
+  const [currentTemplate, backupTemplate] = DEFAULT_VEHICLE_TEMPLATES;
   const currentVehicle = normalizeVehicle({
     id: createId("vehicle"),
-    name: "保时捷 911 GT3",
-    plate: "沪A · 911GT3",
-    mileageKm: 12450,
+    ...currentTemplate,
     createdAt,
     updatedAt: createdAt,
   });
   const backupVehicle = normalizeVehicle({
     id: createId("vehicle"),
-    name: "路虎 卫士 110",
-    plate: "",
-    mileageKm: 4500.5,
+    ...backupTemplate,
     createdAt,
     updatedAt: createdAt,
   });
@@ -454,6 +486,79 @@ function normalizeSnapshot(snapshot = {}) {
     records,
     meta,
   };
+}
+
+function getMetaValue(snapshot, key) {
+  return snapshot?.meta?.find((entry) => entry?.key === key)?.value || "";
+}
+
+function upsertMetaEntries(entries = [], nextEntries = []) {
+  const map = new Map();
+  entries.forEach((entry) => {
+    if (entry?.key) {
+      map.set(entry.key, entry);
+    }
+  });
+  nextEntries.forEach((entry) => {
+    if (entry?.key) {
+      map.set(entry.key, entry);
+    }
+  });
+  return [...map.values()];
+}
+
+function withSnapshotMeta(snapshot, nextEntries = []) {
+  return normalizeSnapshot({
+    ...snapshot,
+    meta: upsertMetaEntries(snapshot.meta || [], nextEntries),
+  });
+}
+
+function cloneSnapshot(snapshot) {
+  if (typeof structuredClone === "function") {
+    return structuredClone(snapshot);
+  }
+  return JSON.parse(JSON.stringify(snapshot));
+}
+
+function getSnapshotLastUpdatedAt(snapshot) {
+  const candidates = [
+    snapshot?.settings?.updatedAt,
+    getMetaValue(snapshot, "savedAt"),
+  ]
+    .concat((snapshot?.vehicles || []).map((vehicle) => vehicle.updatedAt))
+    .concat((snapshot?.stations || []).map((station) => station.updatedAt))
+    .concat((snapshot?.records || []).map((record) => record.updatedAt));
+
+  return candidates.filter(Boolean).sort().at(-1) || "";
+}
+
+function isMeaningfulSnapshot(snapshot) {
+  const normalized = normalizeSnapshot(snapshot);
+  if (normalized.records.length > 0 || normalized.stations.length > 0) {
+    return true;
+  }
+
+  if (normalized.settings.unit !== "metric" || normalized.settings.theme !== "dark") {
+    return true;
+  }
+
+  if (normalized.vehicles.length !== DEFAULT_VEHICLE_TEMPLATES.length) {
+    return true;
+  }
+
+  const firstVehicleId = normalized.vehicles[0]?.id || "";
+  if (normalized.settings.activeVehicleId !== firstVehicleId) {
+    return true;
+  }
+
+  return normalized.vehicles.some((vehicle, index) => {
+    const template = DEFAULT_VEHICLE_TEMPLATES[index];
+    if (!template) {
+      return true;
+    }
+    return vehicle.name !== template.name || vehicle.plate !== template.plate || Math.abs(vehicle.mileageKm - template.mileageKm) > 0.01;
+  });
 }
 
 function readLegacyJson(key, fallback) {
@@ -659,7 +764,7 @@ async function readRawSnapshot() {
   };
 }
 
-async function saveSnapshot(snapshot, extraMeta = []) {
+async function saveSnapshot(snapshot, extraMeta = [], options = {}) {
   const nextSnapshot = normalizeSnapshot({
     ...snapshot,
     meta: [...(snapshot.meta || []), ...extraMeta, { key: "savedAt", value: nowIso() }],
@@ -678,6 +783,10 @@ async function saveSnapshot(snapshot, extraMeta = []) {
   nextSnapshot.meta.forEach((entry) => transaction.objectStore(STORES.meta).put(entry));
 
   await transactionToPromise(transaction);
+  if (!options.skipCloud) {
+    scheduleCloudSync("local-save");
+  }
+  return nextSnapshot;
 }
 
 async function bootstrapDatabase() {
@@ -693,7 +802,7 @@ async function bootstrapDatabase() {
       key: legacy ? "legacyBootstrappedAt" : "bootstrappedAt",
       value: nowIso(),
     },
-  ]);
+  ], { skipCloud: true });
 
   if (legacy) {
     cleanupLegacyStorage();
@@ -702,6 +811,287 @@ async function bootstrapDatabase() {
 
 async function loadSnapshot() {
   return normalizeSnapshot(await readRawSnapshot());
+}
+
+function getCloudSnapshotPayload(snapshot) {
+  const nextSnapshot = cloneSnapshot(normalizeSnapshot(snapshot));
+  nextSnapshot.meta = (nextSnapshot.meta || []).filter((entry) => !Object.values(CLOUD_META_KEYS).includes(entry.key));
+  return nextSnapshot;
+}
+
+function applyCloudMeta(snapshot, userId, remoteUpdatedAt) {
+  return withSnapshotMeta(snapshot, [
+    { key: CLOUD_META_KEYS.lastSyncedAt, value: nowIso() },
+    { key: CLOUD_META_KEYS.remoteUpdatedAt, value: remoteUpdatedAt || nowIso() },
+    { key: CLOUD_META_KEYS.userId, value: userId || "" },
+  ]);
+}
+
+function shouldPullRemoteSnapshot(localSnapshot, remoteSnapshot, remoteUpdatedAt, userId) {
+  const remoteMeaningful = isMeaningfulSnapshot(remoteSnapshot);
+  if (!remoteMeaningful) {
+    return false;
+  }
+
+  const localMeaningful = isMeaningfulSnapshot(localSnapshot);
+  if (!localMeaningful) {
+    return true;
+  }
+
+  const knownUserId = getMetaValue(localSnapshot, CLOUD_META_KEYS.userId);
+  if (knownUserId && knownUserId !== userId) {
+    return true;
+  }
+
+  const localBaseline = getMetaValue(localSnapshot, CLOUD_META_KEYS.remoteUpdatedAt) || getSnapshotLastUpdatedAt(localSnapshot);
+  const remoteBaseline = remoteUpdatedAt || getSnapshotLastUpdatedAt(remoteSnapshot);
+  return remoteBaseline > localBaseline;
+}
+
+function shouldPushLocalSnapshot(localSnapshot, remoteEnvelope, userId) {
+  if (!isMeaningfulSnapshot(localSnapshot)) {
+    return false;
+  }
+
+  const knownUserId = getMetaValue(localSnapshot, CLOUD_META_KEYS.userId);
+  if (knownUserId && knownUserId !== userId) {
+    return false;
+  }
+
+  if (!remoteEnvelope) {
+    return true;
+  }
+
+  const remoteSnapshot = normalizeSnapshot(remoteEnvelope.snapshot || {});
+  if (!isMeaningfulSnapshot(remoteSnapshot)) {
+    return true;
+  }
+
+  const knownRemoteUpdatedAt = getMetaValue(localSnapshot, CLOUD_META_KEYS.remoteUpdatedAt);
+  const localUpdatedAt = getSnapshotLastUpdatedAt(localSnapshot);
+  const remoteUpdatedAt = remoteEnvelope.updatedAt || getSnapshotLastUpdatedAt(remoteSnapshot);
+
+  if (knownRemoteUpdatedAt && remoteUpdatedAt === knownRemoteUpdatedAt) {
+    return localUpdatedAt > knownRemoteUpdatedAt;
+  }
+
+  return localUpdatedAt > remoteUpdatedAt;
+}
+
+async function ensureSupabaseClient() {
+  if (cloudState.client) {
+    return cloudState.client;
+  }
+
+  if (typeof window === "undefined" || typeof window.supabase?.createClient !== "function") {
+    return null;
+  }
+
+  cloudState.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+
+  if (!cloudState.authBound) {
+    cloudState.authBound = true;
+    cloudState.client.auth.onAuthStateChange((event, session) => {
+      cloudState.session = session || null;
+      cloudState.user = session?.user || null;
+
+      window.setTimeout(() => {
+        void renderCloudAuthState();
+
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+          void syncCloudSnapshot({ reason: `auth:${event.toLowerCase()}`, silent: true });
+        }
+      }, 0);
+    });
+  }
+
+  const { data, error } = await cloudState.client.auth.getSession();
+  if (error) {
+    throw error;
+  }
+
+  cloudState.session = data.session || null;
+  cloudState.user = data.session?.user || null;
+  return cloudState.client;
+}
+
+async function fetchRemoteSnapshotEnvelope(client) {
+  const { data, error } = await client
+    .from(CLOUD_TABLE)
+    .select("snapshot, updated_at")
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    snapshot: normalizeSnapshot(data.snapshot || {}),
+    updatedAt: String(data.updated_at || ""),
+  };
+}
+
+async function renderCloudAuthState(snapshot = null) {
+  const statusElement = document.getElementById("cloudAuthStatus");
+  if (!statusElement) {
+    return;
+  }
+
+  const hintElement = document.getElementById("cloudAuthHint");
+  const syncElement = document.getElementById("cloudLastSyncStatus");
+  const emailInput = document.getElementById("cloudEmail");
+  const passwordInput = document.getElementById("cloudPassword");
+  const signUpButton = document.getElementById("cloudSignUpButton");
+  const signInButton = document.getElementById("cloudSignInButton");
+  const syncButton = document.getElementById("cloudSyncButton");
+  const signOutButton = document.getElementById("cloudSignOutButton");
+  const nextSnapshot = snapshot || (await loadSnapshot());
+  const userEmail = cloudState.user?.email || "";
+
+  if (emailInput && userEmail) {
+    emailInput.value = userEmail;
+  }
+
+  const isSignedIn = Boolean(cloudState.user);
+  const lastSyncedAt = getMetaValue(nextSnapshot, CLOUD_META_KEYS.lastSyncedAt);
+
+  statusElement.textContent = isSignedIn ? `已登录：${userEmail}` : "未登录云同步";
+  if (hintElement) {
+    hintElement.textContent = isSignedIn ? "当前账号已连接，可在重装 PWA 后恢复这套数据" : "登录后可在重装 PWA 后恢复车辆与记录";
+  }
+
+  if (syncElement) {
+    if (cloudState.syncInFlight) {
+      syncElement.textContent = "最近云同步：同步进行中…";
+    } else if (lastSyncedAt) {
+      syncElement.textContent = `最近云同步：${formatDateHeading(String(lastSyncedAt).slice(0, 10))} ${formatTime(lastSyncedAt)}`;
+    } else {
+      syncElement.textContent = "最近云同步：未开始";
+    }
+  }
+
+  if (emailInput) {
+    emailInput.disabled = isSignedIn;
+  }
+  if (passwordInput) {
+    passwordInput.disabled = isSignedIn;
+  }
+  if (signUpButton) {
+    signUpButton.disabled = isSignedIn || cloudState.syncInFlight;
+  }
+  if (signInButton) {
+    signInButton.disabled = isSignedIn || cloudState.syncInFlight;
+  }
+  if (syncButton) {
+    syncButton.disabled = !isSignedIn || cloudState.syncInFlight;
+  }
+  if (signOutButton) {
+    signOutButton.disabled = !isSignedIn || cloudState.syncInFlight;
+  }
+}
+
+function scheduleCloudSync(reason, options = {}) {
+  window.clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = window.setTimeout(() => {
+    void syncCloudSnapshot({
+      reason,
+      silent: options.silent !== false,
+    });
+  }, options.immediate ? 0 : CLOUD_SYNC_DEBOUNCE_MS);
+}
+
+async function syncCloudSnapshot(options = {}) {
+  const client = await ensureSupabaseClient().catch((error) => {
+    console.error(error);
+    return null;
+  });
+
+  if (!client || !cloudState.user) {
+    await renderCloudAuthState();
+    return null;
+  }
+
+  if (cloudState.syncInFlight) {
+    cloudState.syncQueued = true;
+    return null;
+  }
+
+  cloudState.syncInFlight = true;
+  await renderCloudAuthState();
+
+  try {
+    let localSnapshot = await loadSnapshot();
+    const remoteEnvelope = await fetchRemoteSnapshotEnvelope(client);
+    const userId = cloudState.user.id;
+
+    if (remoteEnvelope && shouldPullRemoteSnapshot(localSnapshot, remoteEnvelope.snapshot, remoteEnvelope.updatedAt, userId)) {
+      const pulledSnapshot = applyCloudMeta(remoteEnvelope.snapshot, userId, remoteEnvelope.updatedAt);
+      const savedSnapshot = await saveSnapshot(pulledSnapshot, [], { skipCloud: true });
+      await renderCloudAuthState(savedSnapshot);
+      return savedSnapshot;
+    }
+
+    if (!shouldPushLocalSnapshot(localSnapshot, remoteEnvelope, userId)) {
+      await renderCloudAuthState(localSnapshot);
+      return localSnapshot;
+    }
+
+    const payload = {
+      user_id: userId,
+      snapshot: getCloudSnapshotPayload(localSnapshot),
+      schema_version: DB_VERSION,
+      app_version: APP_VERSION,
+    };
+
+    const { data, error } = await client
+      .from(CLOUD_TABLE)
+      .upsert(payload, { onConflict: "user_id" })
+      .select("updated_at")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    localSnapshot = applyCloudMeta(localSnapshot, userId, String(data?.updated_at || nowIso()));
+    const savedSnapshot = await saveSnapshot(localSnapshot, [], { skipCloud: true });
+    await renderCloudAuthState(savedSnapshot);
+
+    if (!options.silent) {
+      showToast("云同步已完成");
+    }
+
+    return savedSnapshot;
+  } catch (error) {
+    console.error(error);
+    if (!options.silent) {
+      const message = error instanceof Error ? error.message : String(error || "");
+      showToast(
+        message.includes(CLOUD_TABLE) || message.includes("relation") || message.includes("schema cache")
+          ? "云同步表尚未初始化，请先执行 supabase/setup.sql"
+          : "云同步失败，请稍后重试",
+        "warning"
+      );
+    }
+    return null;
+  } finally {
+    cloudState.syncInFlight = false;
+    await renderCloudAuthState();
+    if (cloudState.syncQueued) {
+      cloudState.syncQueued = false;
+      scheduleCloudSync("queued-sync");
+    }
+  }
 }
 
 function getVehicleMap(snapshot) {
@@ -1443,6 +1833,8 @@ function renderSettingsPage(snapshot) {
     "settingsLastSync",
     latestRecord ? `最后同步：${formatDateHeading(latestRecord.date)} ${formatTime(latestRecord.updatedAt || latestRecord.createdAt)}` : "最后同步：暂无数据"
   );
+
+  void renderCloudAuthState(snapshot);
 }
 
 function promptVehicleFields(initialVehicle = {}, options = {}) {
@@ -1753,11 +2145,27 @@ async function initSettingsPage(snapshot) {
   const backupRestoreCard = document.getElementById("backupRestoreCard");
   const backupImportInput = document.getElementById("backupImportInput");
   const darkModeToggle = document.getElementById("darkModeToggle");
+  const cloudEmailInput = document.getElementById("cloudEmail");
+  const cloudPasswordInput = document.getElementById("cloudPassword");
+  const cloudSignUpButton = document.getElementById("cloudSignUpButton");
+  const cloudSignInButton = document.getElementById("cloudSignInButton");
+  const cloudSyncButton = document.getElementById("cloudSyncButton");
+  const cloudSignOutButton = document.getElementById("cloudSignOutButton");
 
   renderSettingsPage(snapshot);
 
   if (snapshot.vehicles.length > MAX_MANAGED_VEHICLES) {
     showToast(`当前存在 ${snapshot.vehicles.length} 辆车，本版设置页仅支持管理前 ${MAX_MANAGED_VEHICLES} 辆`, "warning");
+  }
+
+  function readCloudCredentials() {
+    const email = String(cloudEmailInput?.value || "").trim().toLowerCase();
+    const password = String(cloudPasswordInput?.value || "").trim();
+    if (!email || !password) {
+      showToast("请先填写邮箱和密码", "warning");
+      return null;
+    }
+    return { email, password };
   }
 
   async function persistTheme(nextTheme) {
@@ -1995,6 +2403,100 @@ async function initSettingsPage(snapshot) {
     await persistTheme(nextTheme);
   });
 
+  cloudSignUpButton?.addEventListener("click", async () => {
+    const credentials = readCloudCredentials();
+    if (!credentials) {
+      return;
+    }
+
+    const client = await ensureSupabaseClient();
+    if (!client) {
+      showToast("云同步组件加载失败，请刷新重试", "warning");
+      return;
+    }
+
+    const { data, error } = await client.auth.signUp({
+      email: credentials.email,
+      password: credentials.password,
+      options: {
+        emailRedirectTo: SUPABASE_REDIRECT_URL,
+      },
+    });
+
+    if (error) {
+      showToast(error.message, "warning");
+      return;
+    }
+
+    if (cloudPasswordInput) {
+      cloudPasswordInput.value = "";
+    }
+
+    if (data.session) {
+      showToast("注册成功，正在同步数据");
+      await syncCloudSnapshot({ reason: "manual-signup" });
+      renderSettingsPage(await loadSnapshot());
+      return;
+    }
+
+    showToast("注册成功，请前往邮箱确认后再返回应用登录");
+    await renderCloudAuthState(await loadSnapshot());
+  });
+
+  cloudSignInButton?.addEventListener("click", async () => {
+    const credentials = readCloudCredentials();
+    if (!credentials) {
+      return;
+    }
+
+    const client = await ensureSupabaseClient();
+    if (!client) {
+      showToast("云同步组件加载失败，请刷新重试", "warning");
+      return;
+    }
+
+    const { error } = await client.auth.signInWithPassword(credentials);
+    if (error) {
+      showToast(error.message, "warning");
+      return;
+    }
+
+    if (cloudPasswordInput) {
+      cloudPasswordInput.value = "";
+    }
+
+    showToast("登录成功，正在同步数据");
+    const nextSnapshot = (await syncCloudSnapshot({ reason: "manual-signin", silent: true })) || (await loadSnapshot());
+    renderSettingsPage(nextSnapshot);
+  });
+
+  cloudSyncButton?.addEventListener("click", async () => {
+    const nextSnapshot = (await syncCloudSnapshot({ reason: "manual-sync", silent: false })) || (await loadSnapshot());
+    renderSettingsPage(nextSnapshot);
+  });
+
+  cloudSignOutButton?.addEventListener("click", async () => {
+    const client = await ensureSupabaseClient();
+    if (!client) {
+      showToast("云同步组件加载失败，请刷新重试", "warning");
+      return;
+    }
+
+    const { error } = await client.auth.signOut();
+    if (error) {
+      showToast(error.message, "warning");
+      return;
+    }
+
+    cloudState.session = null;
+    cloudState.user = null;
+    if (cloudPasswordInput) {
+      cloudPasswordInput.value = "";
+    }
+    await renderCloudAuthState(await loadSnapshot());
+    showToast("已退出云同步账号");
+  });
+
   document.querySelectorAll("[data-kind-target]").forEach((card) => {
     card.addEventListener("click", () => {
       const kind = card.getAttribute("data-kind-target");
@@ -2011,10 +2513,16 @@ async function initPage() {
   bindSystemThemeWatcher();
   registerServiceWorker();
   await bootstrapDatabase();
+  await ensureSupabaseClient().catch((error) => {
+    console.error(error);
+  });
   bindThemeEntryPoints();
   showFlash();
 
-  const snapshot = await loadSnapshot();
+  let snapshot = await loadSnapshot();
+  if (cloudState.user) {
+    snapshot = (await syncCloudSnapshot({ reason: "startup-sync", silent: true })) || snapshot;
+  }
   applyTheme(snapshot.settings.theme);
 
   switch (document.body.dataset.page) {
@@ -2038,6 +2546,7 @@ async function initPage() {
   }
 
   renderFooterQuote(document.body.dataset.page);
+  await renderCloudAuthState(snapshot);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
