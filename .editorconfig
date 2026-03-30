@@ -10,5 +10,8 @@ indent_size = 2
 [*.{html,css,js,json,webmanifest,md}]
 charset = utf-8
 
+[app.js]
+charset = utf-8-bom
+
 [*.png]
 insert_final_newline = false

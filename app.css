@@ -126,12 +126,12 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.app-dashboard-story-card h3 {
-  color: #ffffff !important;
+.app-dashboard-story-kicker {
+  color: var(--app-accent) !important;
 }
 
-.app-dashboard-story-card p {
-  color: rgba(255, 255, 255, 0.8) !important;
+.app-dashboard-story-quote {
+  color: #ffffff !important;
 }
 
 .app-nav-link {
@@ -319,4 +319,9 @@ textarea:focus-visible {
 .app-toast--warning {
   border-color: rgba(255, 115, 81, 0.35);
   color: #ffd2c8;
+}
+
+html.light .app-toast--warning {
+  border-color: rgba(198, 85, 56, 0.28);
+  color: #8f2f18;
 }

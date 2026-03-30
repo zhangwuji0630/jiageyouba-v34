@@ -1,4 +1,4 @@
-const DB_NAME = "jiageyouba-v34-db";
+﻿const DB_NAME = "jiageyouba-v34-db";
 const DB_VERSION = 1;
 const APP_SETTINGS_ID = "app";
 
@@ -22,6 +22,7 @@ const MILES_PER_KM = 0.621371;
 const DONUT_CIRCUMFERENCE = 251.2;
 const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const THEME_ORDER = ["dark", "light", "system"];
+const MAX_MANAGED_VEHICLES = 2;
 
 const CATEGORY_META = Object.freeze({
   fuel: { label: "加油" },
@@ -540,14 +541,21 @@ function normalizeImportedSnapshot(payload) {
   }
 
   if (Array.isArray(payload.vehicles) || Array.isArray(payload.stations) || payload.settings?.activeVehicleId) {
-    return normalizeSnapshot(payload);
+    return validateManagedVehicleLimit(normalizeSnapshot(payload));
   }
 
   if (Array.isArray(payload.records)) {
-    return migrateLegacyPayload(payload);
+    return validateManagedVehicleLimit(migrateLegacyPayload(payload));
   }
 
   throw new Error("备份文件格式不支持");
+}
+
+function validateManagedVehicleLimit(snapshot) {
+  if (snapshot.vehicles.length > MAX_MANAGED_VEHICLES) {
+    throw new Error(`当前版本最多支持 ${MAX_MANAGED_VEHICLES} 辆车，请精简后再导入`);
+  }
+  return snapshot;
 }
 
 function cleanupLegacyStorage() {
@@ -1148,7 +1156,8 @@ function toCsv(snapshot) {
         })
         .join(",")
     )
-    .join("\r\n");
+    .join("\r\n")
+    .replace(/^/, "\uFEFF");
 }
 
 function registerServiceWorker() {
@@ -1747,6 +1756,10 @@ async function initSettingsPage(snapshot) {
 
   renderSettingsPage(snapshot);
 
+  if (snapshot.vehicles.length > MAX_MANAGED_VEHICLES) {
+    showToast(`当前存在 ${snapshot.vehicles.length} 辆车，本版设置页仅支持管理前 ${MAX_MANAGED_VEHICLES} 辆`, "warning");
+  }
+
   async function persistTheme(nextTheme) {
     const nextSnapshot = await loadSnapshot();
     nextSnapshot.settings = normalizeSettings({
@@ -1863,6 +1876,11 @@ async function initSettingsPage(snapshot) {
 
   addCarCard?.addEventListener("click", async () => {
     const nextSnapshot = await loadSnapshot();
+    if (nextSnapshot.vehicles.length >= MAX_MANAGED_VEHICLES) {
+      showToast(`当前版本最多支持 ${MAX_MANAGED_VEHICLES} 辆车，请先编辑现有车辆`, "warning");
+      return;
+    }
+
     const fields = promptVehicleFields(
       {
         name: "",
