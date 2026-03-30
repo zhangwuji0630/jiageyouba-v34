@@ -16,9 +16,12 @@ const LEGACY_STORAGE_KEYS = Object.freeze({
 });
 
 const CATEGORY_ORDER = ["fuel", "maintenance", "wash", "repair", "accessory", "decoration"];
+const NON_FUEL_KINDS = CATEGORY_ORDER.filter((kind) => kind !== "fuel");
 const FUEL_TYPES = ["92#", "95#", "98#"];
 const MILES_PER_KM = 0.621371;
 const DONUT_CIRCUMFERENCE = 251.2;
+const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
+const THEME_ORDER = ["dark", "light", "system"];
 
 const CATEGORY_META = Object.freeze({
   fuel: { label: "加油" },
@@ -29,20 +32,120 @@ const CATEGORY_META = Object.freeze({
   decoration: { label: "配饰" },
 });
 
+const NON_FUEL_FORM_META = Object.freeze({
+  maintenance: {
+    kicker: "SERVICE ENTRY",
+    headingCreate: "记录本次保养",
+    headingEdit: "编辑保养记录",
+    amountLabel: "保养花费 (CNY)",
+    titleLabel: "保养项目",
+    titlePlaceholder: "例如 机油与机滤更换",
+    notePlaceholder: "输入保养内容、品牌或店铺备注",
+    defaultTitle: "常规保养",
+  },
+  wash: {
+    kicker: "WASH ENTRY",
+    headingCreate: "记录本次洗车",
+    headingEdit: "编辑洗车记录",
+    amountLabel: "洗车花费 (CNY)",
+    titleLabel: "洗车项目",
+    titlePlaceholder: "例如 精洗 / 内饰清洁",
+    notePlaceholder: "输入洗车方式、店名或附加项目",
+    defaultTitle: "车辆清洁",
+  },
+  repair: {
+    kicker: "REPAIR ENTRY",
+    headingCreate: "记录本次维修",
+    headingEdit: "编辑维修记录",
+    amountLabel: "维修花费 (CNY)",
+    titleLabel: "维修项目",
+    titlePlaceholder: "例如 刹车片 / 轮胎修补",
+    notePlaceholder: "输入故障、部件或维修说明",
+    defaultTitle: "维修处理",
+  },
+  accessory: {
+    kicker: "PARTS ENTRY",
+    headingCreate: "记录本次配件支出",
+    headingEdit: "编辑配件记录",
+    amountLabel: "配件花费 (CNY)",
+    titleLabel: "配件名称",
+    titlePlaceholder: "例如 雨刮器 / 脚垫",
+    notePlaceholder: "输入品牌、型号或安装说明",
+    defaultTitle: "车辆配件",
+  },
+  decoration: {
+    kicker: "STYLE ENTRY",
+    headingCreate: "记录本次配饰支出",
+    headingEdit: "编辑配饰记录",
+    amountLabel: "配饰花费 (CNY)",
+    titleLabel: "配饰名称",
+    titlePlaceholder: "例如 方向盘套 / 香氛",
+    notePlaceholder: "输入配饰样式、颜色或购买说明",
+    defaultTitle: "车辆配饰",
+  },
+});
+
+const THEME_META = Object.freeze({
+  dark: {
+    label: "深色",
+    hint: "保持当前深色视觉主题",
+    icon: "dark_mode",
+  },
+  light: {
+    label: "浅色",
+    hint: "切换到单独适配的浅色主题",
+    icon: "light_mode",
+  },
+  system: {
+    label: "跟随系统",
+    hint: "跟随系统自动切换视觉主题",
+    icon: "brightness_auto",
+  },
+});
+
+const FOOTER_QUOTES = Object.freeze({
+  dashboard: [
+    "把路走长一点，把心放远一点。",
+    "油门不必太急，方向要一直清楚。",
+    "每一次出发，都算数。",
+    "今天的公里数，也是生活的进度条。",
+  ],
+  add: [
+    "补满能量，再把生活继续开远。",
+    "认真记下一笔，后面的路会更清楚。",
+    "每一次补给，都是下一段路的底气。",
+    "加一点油，也给自己留一点余量。",
+  ],
+  stats: [
+    "数字会说话，习惯也会留下痕迹。",
+    "会复盘的人，路通常走得更稳。",
+    "趋势不是结果，是选择累积后的方向。",
+    "把开销看清，才能把节奏握稳。",
+  ],
+  logs: [
+    "回头看过的每一程，都会帮你走稳下一程。",
+    "历史不是堆叠，是长期习惯的轮廓。",
+    "每一笔记录，都是和自己对齐的一次确认。",
+    "路走过之后，最好还能留下清楚的坐标。",
+  ],
+  settings: [
+    "车会陪你走很远，细节决定陪多久。",
+    "把常用设置理顺，日常使用才会顺手。",
+    "真正耐看的产品，通常也足够耐用。",
+    "把基础打磨好，之后每次打开都会更舒服。",
+  ],
+});
+
 const FLASH_MESSAGES = Object.freeze({
   saved: "记录已保存",
   updated: "记录已更新",
   imported: "备份已恢复",
-  themeSoon: "浅色主题会单独设计，这一版先固定深色",
   vehicleSwitched: "已切换当前驾驶车辆",
 });
 
-const DEFAULT_THEME_MESSAGE = "浅色主题会单独设计，这一版先固定深色";
-const DEFAULT_MODULE_MESSAGE = "该模块的数据模型已经预留，录入页会在下一轮接入";
-const DEFAULT_GENERIC_EDIT_MESSAGE = "该记录将在对应模块中编辑，当前版本先完成数据归档";
-
 let databasePromise = null;
 let toastTimer = 0;
+let systemThemeWatcherBound = false;
 
 function createId(prefix = "id") {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -183,11 +286,12 @@ function dedupeMeta(items) {
 function normalizeSettings(raw = {}) {
   const createdAt = raw.createdAt || nowIso();
   const updatedAt = raw.updatedAt || createdAt;
+  const theme = THEME_ORDER.includes(raw.theme) ? raw.theme : "dark";
 
   return {
     id: APP_SETTINGS_ID,
     unit: raw.unit === "imperial" ? "imperial" : "metric",
-    theme: "dark",
+    theme,
     currency: "CNY",
     activeVehicleId: String(raw.activeVehicleId || ""),
     createdAt,
@@ -794,6 +898,144 @@ function getCategoryCountLabel(count) {
   return count > 0 ? `共计 ${count} 次` : "暂无记录";
 }
 
+function isNonFuelKind(kind) {
+  return NON_FUEL_KINDS.includes(kind);
+}
+
+function getNonFuelFormMeta(kind) {
+  return NON_FUEL_FORM_META[kind] || NON_FUEL_FORM_META.maintenance;
+}
+
+function readCachedThemeMode() {
+  try {
+    const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
+    return THEME_ORDER.includes(raw) ? raw : "dark";
+  } catch {
+    return "dark";
+  }
+}
+
+function writeCachedThemeMode(themeMode) {
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+  } catch {
+    // Ignore cache write failures.
+  }
+}
+
+function getSystemTheme() {
+  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
+}
+
+function resolveTheme(themeMode) {
+  return themeMode === "system" ? getSystemTheme() : themeMode;
+}
+
+function syncThemeButtons(themeMode) {
+  const iconName = THEME_META[themeMode]?.icon || THEME_META.dark.icon;
+  [
+    "dashboardThemeHint",
+    "addThemeHint",
+    "statsThemeHint",
+    "logsThemeHint",
+    "darkModeToggle",
+  ].forEach((id) => {
+    const button = document.getElementById(id);
+    if (!button) {
+      return;
+    }
+
+    const icon = button.querySelector(".material-symbols-outlined") || button;
+    icon.textContent = iconName;
+    icon.dataset.icon = iconName;
+  });
+}
+
+function applyTheme(themeMode) {
+  const root = document.documentElement;
+  const effectiveTheme = resolveTheme(themeMode);
+  root.classList.remove("light", "dark");
+  root.classList.add(effectiveTheme);
+  root.dataset.themeMode = themeMode;
+
+  const themeColorMeta = document.getElementById("themeColorMeta");
+  if (themeColorMeta) {
+    themeColorMeta.setAttribute("content", effectiveTheme === "light" ? "#f4f5ef" : "#0e0e0e");
+  }
+
+  writeCachedThemeMode(themeMode);
+  syncThemeButtons(themeMode);
+}
+
+function bindSystemThemeWatcher() {
+  if (systemThemeWatcherBound || !window.matchMedia) {
+    return;
+  }
+
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  const handleChange = () => {
+    if ((document.documentElement.dataset.themeMode || readCachedThemeMode()) === "system") {
+      applyTheme("system");
+    }
+  };
+
+  if (typeof media.addEventListener === "function") {
+    media.addEventListener("change", handleChange);
+  } else if (typeof media.addListener === "function") {
+    media.addListener(handleChange);
+  }
+
+  systemThemeWatcherBound = true;
+}
+
+function applyThemeToggleStyles(activeTheme) {
+  document.querySelectorAll("[data-theme]").forEach((button) => {
+    const isActive = button.dataset.theme === activeTheme;
+    button.classList.add("toggle-pill");
+    button.classList.toggle("toggle-pill--active", isActive);
+    button.classList.toggle("toggle-pill--inactive", !isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+function getThemeHint(themeMode) {
+  return THEME_META[themeMode]?.hint || THEME_META.dark.hint;
+}
+
+function cycleThemeMode(themeMode) {
+  const index = THEME_ORDER.indexOf(themeMode);
+  return THEME_ORDER[(index + 1 + THEME_ORDER.length) % THEME_ORDER.length];
+}
+
+function renderFooterQuote(page) {
+  const quoteMap = {
+    dashboard: "dashboardFooterQuote",
+    add: "addFooterQuote",
+    stats: "statsFooterQuote",
+    logs: "logsFooterQuote",
+    settings: "settingsFooterQuote",
+  };
+
+  const targetId = quoteMap[page];
+  const quotes = FOOTER_QUOTES[page];
+  const element = targetId ? document.getElementById(targetId) : null;
+
+  if (!element || !quotes?.length) {
+    return;
+  }
+
+  const sessionKey = `${THEME_STORAGE_KEY}:quote:${page}`;
+  const previous = window.sessionStorage.getItem(sessionKey);
+  let nextQuote = quotes[Math.floor(Math.random() * quotes.length)];
+
+  if (quotes.length > 1 && nextQuote === previous) {
+    nextQuote = quotes[(quotes.indexOf(nextQuote) + 1) % quotes.length];
+  }
+
+  element.textContent = nextQuote;
+  window.sessionStorage.setItem(sessionKey, nextQuote);
+}
+
 function showToast(message, tone = "default") {
   if (!message) {
     return;
@@ -922,7 +1164,7 @@ function registerServiceWorker() {
 function bindThemeEntryPoints() {
   ["dashboardThemeHint", "addThemeHint", "statsThemeHint", "logsThemeHint"].forEach((id) => {
     document.getElementById(id)?.addEventListener("click", () => {
-      window.location.href = "./settings.html?flash=themeSoon#themePreferences";
+      window.location.href = "./settings.html#themePreferences";
     });
   });
 }
@@ -943,6 +1185,16 @@ function applyUnitToggleStyles(activeUnit) {
     button.classList.add("toggle-pill");
     button.classList.toggle("toggle-pill--active", isActive);
     button.classList.toggle("toggle-pill--inactive", !isActive);
+  });
+}
+
+function setRecordKindButtons(activeKind) {
+  document.querySelectorAll("[data-record-kind]").forEach((button) => {
+    const isActive = button.dataset.recordKind === activeKind;
+    button.classList.add("fuel-option");
+    button.classList.toggle("fuel-option--active", isActive);
+    button.classList.toggle("fuel-option--inactive", !isActive);
+    button.setAttribute("aria-pressed", String(isActive));
   });
 }
 
@@ -1018,8 +1270,8 @@ function getHistoryCardMetrics(record, efficiencyByRecordId, unitMode) {
     leftValue: getCategoryLabel(record.kind),
     middleLabel: "当前里程",
     middleValue: record.odometerKm > 0 ? `${formatDistanceValue(record.odometerKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
-    rightLabel: "说明",
-    rightValue: record.title || "--",
+    rightLabel: record.note ? "备注" : "项目",
+    rightValue: record.note || record.title || "--",
   };
 }
 
@@ -1090,11 +1342,6 @@ function renderHistoryList(snapshot) {
         return;
       }
 
-      if (record.kind !== "fuel") {
-        showToast(DEFAULT_GENERIC_EDIT_MESSAGE);
-        return;
-      }
-
       window.location.href = `./add.html?id=${encodeURIComponent(record.id)}`;
     });
   });
@@ -1117,6 +1364,10 @@ function renderStatsPage(snapshot) {
   const fuelShare = monthlySpend > 0 ? (summaryByKind.fuel.amount / monthlySpend) * 100 : 0;
   const otherShare = Math.max(0, 100 - fuelShare);
   const compare = getMonthCompareValue(monthlySpend, previousMonthlySpend);
+  const computedStyles = window.getComputedStyle(document.documentElement);
+  const accentStroke = computedStyles.getPropertyValue("--app-accent-solid").trim() || "#cafd00";
+  const secondaryStroke = computedStyles.getPropertyValue("--app-secondary").trim() || "#bf81ff";
+  const baseStroke = computedStyles.getPropertyValue("--app-card-elevated").trim() || "#262626";
 
   setText("statsMonthlySpend", formatNumber(monthlySpend, 2));
   setText("statsDailyAverage", formatNumber(dailyAverage, 2));
@@ -1136,14 +1387,21 @@ function renderStatsPage(snapshot) {
     setText(`stats${suffix}Amount`, formatNumber(summary.amount, 2));
   });
 
+  const baseArc = document.getElementById("statsBaseArc");
+  if (baseArc) {
+    baseArc.setAttribute("stroke", baseStroke);
+  }
+
   const fuelArc = document.getElementById("statsFuelArc");
   if (fuelArc) {
+    fuelArc.setAttribute("stroke", accentStroke);
     fuelArc.setAttribute("stroke-dasharray", `${(DONUT_CIRCUMFERENCE * fuelShare) / 100} ${DONUT_CIRCUMFERENCE}`);
     fuelArc.setAttribute("stroke-dashoffset", "0");
   }
 
   const otherArc = document.getElementById("statsOtherArc");
   if (otherArc) {
+    otherArc.setAttribute("stroke", secondaryStroke);
     otherArc.setAttribute("stroke-dasharray", `${(DONUT_CIRCUMFERENCE * otherShare) / 100} ${DONUT_CIRCUMFERENCE}`);
     otherArc.setAttribute("stroke-dashoffset", `${-(DONUT_CIRCUMFERENCE * fuelShare) / 100}`);
   }
@@ -1167,8 +1425,11 @@ function renderSettingsPage(snapshot) {
   }
 
   applyUnitToggleStyles(snapshot.settings.unit);
+  applyThemeToggleStyles(snapshot.settings.theme);
+  setText("themeModeHint", getThemeHint(snapshot.settings.theme));
+  applyTheme(snapshot.settings.theme);
 
-  const latestRecord = snapshot.records.sort(compareRecordsDesc)[0];
+  const latestRecord = [...snapshot.records].sort(compareRecordsDesc)[0];
   setText(
     "settingsLastSync",
     latestRecord ? `最后同步：${formatDateHeading(latestRecord.date)} ${formatTime(latestRecord.updatedAt || latestRecord.createdAt)}` : "最后同步：暂无数据"
@@ -1206,54 +1467,114 @@ function promptVehicleFields(initialVehicle = {}, options = {}) {
 
 async function initAddPage(snapshot) {
   const params = new URLSearchParams(window.location.search);
+  const requestedKind = isNonFuelKind(params.get("kind")) ? params.get("kind") : "fuel";
   const editingId = params.get("id");
   const activeVehicle = getActiveVehicle(snapshot);
   const form = document.getElementById("recordForm");
+  const pageKicker = document.getElementById("addPageKicker");
+  const pageHeading = document.getElementById("addPageHeading");
+  const pageTitle = document.getElementById("addPageTitle");
+  const dateLabel = document.getElementById("recordDateLabel");
+  const odometerLabel = document.getElementById("recordOdometerLabel");
+  const genericAmountLabel = document.getElementById("recordGenericAmountLabel");
+  const titleLabel = document.getElementById("recordTitleLabel");
+  const noteLabel = document.getElementById("recordNoteLabel");
   const dateInput = document.getElementById("recordDate");
   const odometerInput = document.getElementById("recordOdometer");
   const totalCostInput = document.getElementById("recordTotalCost");
   const litersInput = document.getElementById("recordLiters");
   const fullTankInput = document.getElementById("recordFullTank");
-  const pageHeading = document.getElementById("addPageHeading");
-  const pageTitle = document.getElementById("addPageTitle");
-  let editingRecord = snapshot.records.find((record) => record.id === editingId) || null;
+  const genericAmountInput = document.getElementById("recordGenericAmount");
+  const titleInput = document.getElementById("recordTitle");
+  const noteInput = document.getElementById("recordNote");
+  const fuelPrimaryFields = document.getElementById("fuelPrimaryFields");
+  const genericPrimaryFields = document.getElementById("genericPrimaryFields");
+  const fuelConfigSection = document.getElementById("fuelConfigSection");
+  const genericConfigSection = document.getElementById("genericConfigSection");
+  const editingRecord = snapshot.records.find((record) => record.id === editingId) || null;
 
-  if (editingRecord && editingRecord.kind !== "fuel") {
-    showToast(DEFAULT_GENERIC_EDIT_MESSAGE);
-    window.setTimeout(() => {
-      window.location.href = "./logs.html";
-    }, 300);
-    return;
+  let selectedKind = editingRecord?.kind || requestedKind;
+  let selectedFuelType = editingRecord?.kind === "fuel" ? getFuelPayload(editingRecord).fuelType : "95#";
+
+  function syncPageCopy() {
+    const isFuelMode = selectedKind === "fuel";
+    const meta = isFuelMode ? null : getNonFuelFormMeta(selectedKind);
+
+    if (pageKicker) {
+      pageKicker.textContent = isFuelMode ? "ADD NEW ENTRY" : meta.kicker;
+    }
+
+    if (pageHeading) {
+      pageHeading.textContent = isFuelMode
+        ? editingRecord
+          ? "编辑本次旅程"
+          : "记录本次旅程"
+        : editingRecord
+          ? meta.headingEdit
+          : meta.headingCreate;
+    }
+
+    if (pageTitle) {
+      pageTitle.textContent = editingRecord ? "编辑记录" : "记录";
+    }
+
+    if (dateLabel) {
+      dateLabel.textContent = isFuelMode ? "加油日期" : "记录日期";
+    }
+
+    if (odometerLabel) {
+      odometerLabel.textContent = "当前里程 (KM)";
+    }
+
+    if (!isFuelMode) {
+      if (genericAmountLabel) {
+        genericAmountLabel.textContent = meta.amountLabel;
+      }
+      if (titleLabel) {
+        titleLabel.textContent = meta.titleLabel;
+      }
+      if (noteLabel) {
+        noteLabel.textContent = "补充说明";
+      }
+      if (titleInput) {
+        titleInput.placeholder = meta.titlePlaceholder;
+      }
+      if (noteInput) {
+        noteInput.placeholder = meta.notePlaceholder;
+      }
+    }
   }
 
-  let selectedFuelType = editingRecord ? getFuelPayload(editingRecord).fuelType : "95#";
+  function syncModeVisibility() {
+    const isFuelMode = selectedKind === "fuel";
+    if (fuelPrimaryFields) {
+      fuelPrimaryFields.hidden = !isFuelMode;
+    }
+    if (genericPrimaryFields) {
+      genericPrimaryFields.hidden = isFuelMode;
+    }
+    if (fuelConfigSection) {
+      fuelConfigSection.hidden = !isFuelMode;
+    }
+    if (genericConfigSection) {
+      genericConfigSection.hidden = isFuelMode;
+    }
 
-  if (pageHeading) {
-    pageHeading.textContent = editingRecord ? "编辑本次旅程" : "记录本次旅程";
+    setFuelButtons(selectedFuelType);
+    setRecordKindButtons(selectedKind);
+    syncPageCopy();
   }
 
-  if (pageTitle) {
-    pageTitle.textContent = editingRecord ? "编辑记录" : "记录";
-  }
+  function seedGenericTitle(previousKind = selectedKind) {
+    if (!titleInput || !isNonFuelKind(selectedKind)) {
+      return;
+    }
 
-  if (dateInput) {
-    dateInput.value = editingRecord?.date || getToday();
-  }
-
-  if (odometerInput) {
-    odometerInput.value = editingRecord?.odometerKm || "";
-  }
-
-  if (totalCostInput) {
-    totalCostInput.value = editingRecord?.amount || "";
-  }
-
-  if (litersInput) {
-    litersInput.value = editingRecord ? getFuelPayload(editingRecord).liters || "" : "";
-  }
-
-  if (fullTankInput) {
-    fullTankInput.checked = editingRecord ? getFuelPayload(editingRecord).isFullTank : true;
+    const currentValue = titleInput.value.trim();
+    const previousMeta = getNonFuelFormMeta(previousKind);
+    if (!currentValue || currentValue === previousMeta.defaultTitle || currentValue === getCategoryLabel(previousKind)) {
+      titleInput.value = getNonFuelFormMeta(selectedKind).defaultTitle;
+    }
   }
 
   function updateUnitPrice() {
@@ -1262,7 +1583,7 @@ async function initAddPage(snapshot) {
     setText("recordUnitPriceDisplay", liters > 0 ? formatNumber(totalCost / liters, 2) : "0.00");
   }
 
-  function buildDraftRecord() {
+  function buildFuelDraftRecord() {
     const totalCost = asNumber(totalCostInput?.value);
     const liters = asNumber(litersInput?.value);
     const createdAt = editingRecord?.createdAt || nowIso();
@@ -1275,7 +1596,7 @@ async function initAddPage(snapshot) {
       amount: totalCost,
       odometerKm: asNumber(odometerInput?.value),
       title: `${selectedFuelType} 汽油`,
-      note: editingRecord?.note || "",
+      note: editingRecord?.kind === "fuel" ? editingRecord.note || "" : "",
       createdAt,
       updatedAt: nowIso(),
       payload: {
@@ -1287,12 +1608,69 @@ async function initAddPage(snapshot) {
     });
   }
 
-  function validate(record, records) {
+  function buildGenericDraftRecord() {
+    const createdAt = editingRecord?.createdAt || nowIso();
+    return normalizeRecord({
+      id: editingRecord?.id,
+      vehicleId: editingRecord?.vehicleId || activeVehicle?.id || "",
+      kind: selectedKind,
+      date: dateInput?.value || getToday(),
+      amount: asNumber(genericAmountInput?.value),
+      odometerKm: asNumber(odometerInput?.value),
+      title: titleInput?.value?.trim() || getNonFuelFormMeta(selectedKind).defaultTitle,
+      note: noteInput?.value?.trim() || "",
+      createdAt,
+      updatedAt: nowIso(),
+      payload: {},
+    });
+  }
+
+  function validateFuelRecord(record, records) {
     if (!record.date || record.odometerKm <= 0 || record.amount <= 0 || getFuelPayload(record).liters <= 0) {
       return "请完整填写日期、里程、总花费和加油量";
     }
 
     return validateOdometerSequence(records, record);
+  }
+
+  function validateGenericRecord(record, records) {
+    if (!record.date || record.odometerKm <= 0 || record.amount <= 0 || !record.title.trim()) {
+      return "请完整填写日期、里程、金额和项目名称";
+    }
+
+    return validateOdometerSequence(records, record);
+  }
+
+  if (dateInput) {
+    dateInput.value = editingRecord?.date || getToday();
+  }
+
+  if (odometerInput) {
+    odometerInput.value = editingRecord?.odometerKm || "";
+  }
+
+  if (editingRecord?.kind === "fuel") {
+    if (totalCostInput) {
+      totalCostInput.value = editingRecord.amount || "";
+    }
+    if (litersInput) {
+      litersInput.value = getFuelPayload(editingRecord).liters || "";
+    }
+    if (fullTankInput) {
+      fullTankInput.checked = getFuelPayload(editingRecord).isFullTank;
+    }
+  } else if (editingRecord) {
+    if (genericAmountInput) {
+      genericAmountInput.value = editingRecord.amount || "";
+    }
+    if (titleInput) {
+      titleInput.value = editingRecord.title || "";
+    }
+    if (noteInput) {
+      noteInput.value = editingRecord.note || "";
+    }
+  } else if (isNonFuelKind(selectedKind)) {
+    seedGenericTitle(selectedKind);
   }
 
   document.querySelector("[data-fuel-options]")?.addEventListener("click", (event) => {
@@ -1304,6 +1682,23 @@ async function initAddPage(snapshot) {
     setFuelButtons(selectedFuelType);
   });
 
+  document.querySelector("[data-kind-options]")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-record-kind]");
+    if (!button) {
+      return;
+    }
+
+    const nextKind = button.dataset.recordKind;
+    if (!isNonFuelKind(nextKind)) {
+      return;
+    }
+
+    const previousKind = selectedKind;
+    selectedKind = nextKind;
+    seedGenericTitle(previousKind);
+    syncModeVisibility();
+  });
+
   [totalCostInput, litersInput].forEach((input) => {
     input?.addEventListener("input", updateUnitPrice);
     input?.addEventListener("change", updateUnitPrice);
@@ -1313,8 +1708,11 @@ async function initAddPage(snapshot) {
     event.preventDefault();
 
     const nextSnapshot = await loadSnapshot();
-    const draftRecord = buildDraftRecord();
-    const error = validate(draftRecord, nextSnapshot.records);
+    const draftRecord = selectedKind === "fuel" ? buildFuelDraftRecord() : buildGenericDraftRecord();
+    const error =
+      selectedKind === "fuel"
+        ? validateFuelRecord(draftRecord, nextSnapshot.records)
+        : validateGenericRecord(draftRecord, nextSnapshot.records);
 
     if (error) {
       showToast(error, "warning");
@@ -1332,12 +1730,13 @@ async function initAddPage(snapshot) {
     window.location.href = editingRecord ? "./logs.html?flash=updated" : "./logs.html?flash=saved";
   });
 
-  setFuelButtons(selectedFuelType);
+  syncModeVisibility();
   updateUnitPrice();
 }
 
 async function initSettingsPage(snapshot) {
   const unitGroup = document.querySelector("[data-unit-group]");
+  const themeGroup = document.querySelector("[data-theme-group]");
   const currentCarCard = document.getElementById("currentCarCard");
   const backupCarCard = document.getElementById("backupCarCard");
   const addCarCard = document.getElementById("addCarCard");
@@ -1345,10 +1744,20 @@ async function initSettingsPage(snapshot) {
   const backupRestoreCard = document.getElementById("backupRestoreCard");
   const backupImportInput = document.getElementById("backupImportInput");
   const darkModeToggle = document.getElementById("darkModeToggle");
-  const themeSwitchButton = document.getElementById("themeSwitchButton");
-  const gatedIds = ["maintenanceModuleCard", "washModuleCard", "repairModuleCard", "partsModuleCard"];
 
   renderSettingsPage(snapshot);
+
+  async function persistTheme(nextTheme) {
+    const nextSnapshot = await loadSnapshot();
+    nextSnapshot.settings = normalizeSettings({
+      ...nextSnapshot.settings,
+      theme: nextTheme,
+      updatedAt: nowIso(),
+    });
+    await saveSnapshot(nextSnapshot);
+    renderSettingsPage(await loadSnapshot());
+    showToast(`主题已切换为${THEME_META[nextTheme].label}`);
+  }
 
   unitGroup?.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-unit]");
@@ -1364,6 +1773,15 @@ async function initSettingsPage(snapshot) {
     });
     await saveSnapshot(nextSnapshot);
     renderSettingsPage(await loadSnapshot());
+  });
+
+  themeGroup?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-theme]");
+    if (!button || !THEME_ORDER.includes(button.dataset.theme)) {
+      return;
+    }
+
+    await persistTheme(button.dataset.theme);
   });
 
   currentCarCard?.addEventListener("click", async () => {
@@ -1553,26 +1971,33 @@ async function initSettingsPage(snapshot) {
     }
   });
 
-  [darkModeToggle, themeSwitchButton].forEach((button) => {
-    button?.addEventListener("click", () => {
-      showToast(DEFAULT_THEME_MESSAGE);
-    });
+  darkModeToggle?.addEventListener("click", async () => {
+    const nextSnapshot = await loadSnapshot();
+    const nextTheme = cycleThemeMode(nextSnapshot.settings.theme);
+    await persistTheme(nextTheme);
   });
 
-  gatedIds.forEach((id) => {
-    document.getElementById(id)?.addEventListener("click", () => {
-      showToast(DEFAULT_MODULE_MESSAGE);
+  document.querySelectorAll("[data-kind-target]").forEach((card) => {
+    card.addEventListener("click", () => {
+      const kind = card.getAttribute("data-kind-target");
+      if (!isNonFuelKind(kind)) {
+        return;
+      }
+      window.location.href = `./add.html?kind=${encodeURIComponent(kind)}`;
     });
   });
 }
 
 async function initPage() {
+  applyTheme(readCachedThemeMode());
+  bindSystemThemeWatcher();
   registerServiceWorker();
   await bootstrapDatabase();
   bindThemeEntryPoints();
   showFlash();
 
   const snapshot = await loadSnapshot();
+  applyTheme(snapshot.settings.theme);
 
   switch (document.body.dataset.page) {
     case "dashboard":
@@ -1593,6 +2018,8 @@ async function initPage() {
     default:
       break;
   }
+
+  renderFooterQuote(document.body.dataset.page);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

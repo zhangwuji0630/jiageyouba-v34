@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-  <meta content="#0e0e0e" name="theme-color"/>
+  <meta content="#0e0e0e" id="themeColorMeta" name="theme-color"/>
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>记录 - 加油记录 V3.4</title>
+  <title>记录 - 加油记录 V3.5</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -99,8 +99,8 @@
         }
     </style>
 </head>
-<body class="font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="add">
-  <header class="fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e] flat no-shadows">
+<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="add">
+  <header class="app-topbar fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e] flat no-shadows">
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-3">
         <span class="material-symbols-outlined text-[#cafd00]" data-icon="add_circle">add_circle</span>
@@ -111,9 +111,9 @@
       </button>
     </div>
   </header>
-  <main class="pt-24 pb-32 px-6 max-w-md mx-auto min-h-screen">
-    <div class="mb-12">
-      <p class="font-label text-on-surface-variant text-[0.75rem] font-bold tracking-widest uppercase mb-2">ADD NEW ENTRY</p>
+  <main class="app-main px-6 max-w-md mx-auto min-h-screen">
+    <div class="app-page-hero mb-12">
+      <p class="font-label text-on-surface-variant text-[0.75rem] font-bold tracking-widest uppercase mb-2" id="addPageKicker">ADD NEW ENTRY</p>
       <h2 class="font-headline text-4xl font-extrabold tracking-tight" id="addPageHeading">记录本次旅程</h2>
     </div>
     <form class="space-y-8" id="recordForm">
@@ -122,50 +122,80 @@
           <div class="flex items-center justify-between border-b border-outline-variant/10 pb-4">
             <div class="flex items-center gap-3">
               <span class="material-symbols-outlined text-on-surface-variant" data-icon="calendar_today">calendar_today</span>
-              <span class="font-body text-on-surface-variant text-sm">加油日期</span>
+              <span class="font-body text-on-surface-variant text-sm" id="recordDateLabel">加油日期</span>
             </div>
             <input class="bg-transparent border-none text-right font-headline font-bold text-on-surface focus:ring-0 p-0" id="recordDate" type="date" value="2024-05-20"/>
           </div>
           <div class="space-y-2">
-            <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordOdometer">当前里程 (KM)</label>
+            <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordOdometer" id="recordOdometerLabel">当前里程 (KM)</label>
             <input class="w-full bg-transparent border-none p-0 font-headline text-5xl font-bold text-on-surface placeholder:text-surface-variant focus:ring-0" id="recordOdometer" placeholder="000000" type="number"/>
           </div>
-          <div class="grid grid-cols-2 gap-8 pt-4">
-            <div class="space-y-2">
-              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordTotalCost">总花费 (CNY)</label>
-              <input class="w-full bg-transparent border-none p-0 font-headline text-3xl font-bold text-primary-fixed placeholder:text-surface-variant focus:ring-0" id="recordTotalCost" placeholder="0.00" step="0.01" type="number"/>
+          <div class="space-y-8" id="fuelPrimaryFields">
+            <div class="grid grid-cols-2 gap-8 pt-4">
+              <div class="space-y-2">
+                <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordTotalCost">总花费 (CNY)</label>
+                <input class="w-full bg-transparent border-none p-0 font-headline text-3xl font-bold text-primary-fixed placeholder:text-surface-variant focus:ring-0" id="recordTotalCost" placeholder="0.00" step="0.01" type="number"/>
+              </div>
+              <div class="space-y-2">
+                <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordLiters">加油量 (L)</label>
+                <input class="w-full bg-transparent border-none p-0 font-headline text-3xl font-bold text-on-surface placeholder:text-surface-variant focus:ring-0" id="recordLiters" placeholder="0.00" step="0.01" type="number"/>
+              </div>
             </div>
-            <div class="space-y-2">
-              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordLiters">加油量 (L)</label>
-              <input class="w-full bg-transparent border-none p-0 font-headline text-3xl font-bold text-on-surface placeholder:text-surface-variant focus:ring-0" id="recordLiters" placeholder="0.00" step="0.01" type="number"/>
+            <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
+              <span class="text-on-surface-variant text-sm font-light">推算单价</span>
+              <div class="flex items-baseline gap-1">
+                <span class="font-headline font-bold text-on-surface" id="recordUnitPriceDisplay">0.00</span>
+                <span class="text-[10px] text-on-surface-variant font-bold uppercase">CNY / L</span>
+              </div>
             </div>
           </div>
-          <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
-            <span class="text-on-surface-variant text-sm font-light">推算单价</span>
-            <div class="flex items-baseline gap-1">
-              <span class="font-headline font-bold text-on-surface" id="recordUnitPriceDisplay">0.00</span>
-              <span class="text-[10px] text-on-surface-variant font-bold uppercase">CNY / L</span>
+          <div class="space-y-6" hidden id="genericPrimaryFields">
+            <div class="space-y-2 pt-4">
+              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordGenericAmount" id="recordGenericAmountLabel">总花费 (CNY)</label>
+              <input class="w-full bg-transparent border-none p-0 font-headline text-4xl font-bold text-primary-fixed placeholder:text-surface-variant focus:ring-0" id="recordGenericAmount" placeholder="0.00" step="0.01" type="number"/>
+            </div>
+            <div class="space-y-2">
+              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordTitle" id="recordTitleLabel">项目名称</label>
+              <input class="w-full bg-transparent border-none p-0 font-headline text-3xl font-bold text-on-surface placeholder:text-surface-variant focus:ring-0" id="recordTitle" placeholder="输入项目名称" type="text"/>
             </div>
           </div>
         </div>
         <div class="bg-surface-container rounded-lg p-7 space-y-8">
-          <div class="space-y-4">
-            <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block">油品标号</label>
-            <div class="flex gap-3" data-fuel-options>
-              <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-fuel-type="92#" type="button">92#</button>
-              <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--active" data-fuel-type="95#" type="button">95#</button>
-              <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-fuel-type="98#" type="button">98#</button>
+          <div class="space-y-8" id="fuelConfigSection">
+            <div class="space-y-4">
+              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block">油品标号</label>
+              <div class="flex gap-3" data-fuel-options>
+                <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-fuel-type="92#" type="button">92#</button>
+                <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--active" data-fuel-type="95#" type="button">95#</button>
+                <button class="flex-1 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-fuel-type="98#" type="button">98#</button>
+              </div>
+            </div>
+            <div class="flex items-center justify-between">
+              <div class="space-y-1">
+                <p class="font-headline font-bold text-on-surface">是否加满</p>
+                <p class="text-on-surface-variant text-xs font-light">精准计算油耗数据</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input checked="" class="sr-only peer" id="recordFullTank" type="checkbox"/>
+                <div class="w-14 h-8 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-fixed"></div>
+              </label>
             </div>
           </div>
-          <div class="flex items-center justify-between">
-            <div class="space-y-1">
-              <p class="font-headline font-bold text-on-surface">是否加满</p>
-              <p class="text-on-surface-variant text-xs font-light">精准计算油耗数据</p>
+          <div class="space-y-8" hidden id="genericConfigSection">
+            <div class="space-y-4">
+              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block">记录类型</label>
+              <div class="grid grid-cols-2 gap-3" data-kind-options>
+                <button class="py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--active" data-record-kind="maintenance" type="button">保养</button>
+                <button class="py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-record-kind="wash" type="button">洗车</button>
+                <button class="py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-record-kind="repair" type="button">维修</button>
+                <button class="py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-record-kind="accessory" type="button">配件</button>
+                <button class="col-span-2 py-3 rounded-full font-headline font-bold text-sm fuel-option fuel-option--inactive" data-record-kind="decoration" type="button">配饰</button>
+              </div>
             </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input checked="" class="sr-only peer" id="recordFullTank" type="checkbox"/>
-              <div class="w-14 h-8 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-primary-fixed"></div>
-            </label>
+            <div class="space-y-2">
+              <label class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-widest block" for="recordNote" id="recordNoteLabel">补充说明</label>
+              <textarea class="w-full min-h-28 resize-none rounded-2xl border border-outline-variant/10 bg-surface-container-high px-4 py-4 text-sm text-on-surface placeholder:text-on-surface-variant/60 focus:border-primary-fixed/40 focus:outline-none focus:ring-0" id="recordNote" placeholder="输入说明、项目明细或保养备注"></textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -175,30 +205,30 @@
         </button>
       </div>
     </form>
-    <div class="mt-16 text-center space-y-2 opacity-40">
+    <div class="page-footer-quote mt-16 text-center space-y-2 opacity-40">
       <span class="material-symbols-outlined text-primary-fixed text-xl" data-icon="auto_awesome">auto_awesome</span>
-      <p class="font-body text-sm text-on-surface-variant italic">加满油，向自由出发</p>
+      <p class="font-body text-sm text-on-surface-variant italic" id="addFooterQuote">加满油，向自由出发</p>
     </div>
   </main>
-  <nav class="fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)] no-border tonal-shift">
+  <nav class="app-bottom-nav fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)] no-border tonal-shift">
     <div class="flex justify-around items-center h-20 px-4 pb-safe w-full">
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
         <span class="material-symbols-outlined" data-icon="speed">speed</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">看板</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
+      <a class="app-nav-link app-nav-link--active flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
         <span class="material-symbols-outlined" data-icon="add_circle" style="font-variation-settings: 'FILL' 1;">add_circle</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">记录</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
         <span class="material-symbols-outlined" data-icon="insights">insights</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">趋势</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
         <span class="material-symbols-outlined" data-icon="history">history</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">历史</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
         <span class="material-symbols-outlined" data-icon="settings">settings</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">设置</span>
       </a>

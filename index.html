@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-  <meta content="#0e0e0e" name="theme-color"/>
+  <meta content="#0e0e0e" id="themeColorMeta" name="theme-color"/>
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>看板 - 加油记录 V3.4</title>
+  <title>看板 - 加油记录 V3.5</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -97,8 +97,8 @@
       }
     </style>
 </head>
-<body class="font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="dashboard">
-  <header class="fixed top-0 w-full z-50 bg-[#0e0e0e] no-border tonal-shift">
+<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="dashboard">
+  <header class="app-topbar fixed top-0 w-full z-50 bg-[#0e0e0e] no-border tonal-shift">
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-3 active:scale-95 duration-200 cursor-pointer">
         <span class="material-symbols-outlined text-[#cafd00]" data-icon="speed" style="font-variation-settings: 'FILL' 1;">speed</span>
@@ -107,8 +107,8 @@
       <button class="material-symbols-outlined text-[#adaaaa] hover:opacity-80 transition-opacity active:scale-95 duration-200" data-icon="dark_mode" id="dashboardThemeHint" type="button">dark_mode</button>
     </div>
   </header>
-  <main class="pt-20 pb-32 px-6 max-w-md mx-auto">
-    <div class="mb-10 mt-4">
+  <main class="app-main pt-20 pb-32 px-6 max-w-md mx-auto">
+    <div class="app-page-hero mb-10 mt-4">
       <p class="font-label text-on-surface-variant tracking-widest text-[10px] uppercase mb-1">今日概览</p>
       <h2 class="font-headline text-3xl font-extrabold tracking-tight">数据看板</h2>
     </div>
@@ -121,14 +121,6 @@
         <div class="flex items-center gap-2 text-primary-fixed mt-4">
           <span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
           <span class="font-label text-[10px]" id="dashboardMonthlyDelta">比上月增长 12%</span>
-        </div>
-      </div>
-      <div class="col-span-2 relative overflow-hidden rounded-lg min-h-[180px] group">
-        <img alt="Travel" class="absolute inset-0 w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 transition-all duration-700" data-alt="dramatic cinematic shot of a luxury off-road vehicle driving on a winding coastal road at sunrise with soft golden light and deep shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmkmPlYMlRxhkCxgP4nxVc6UiLt75q1tLWObW8ywqg-Fh9EbmCNhFt1RFYizEci92_sRPespR9YZaJXf0_9uBrR5Z3-8-2H9-YPhml6ZLPPzFTVk5dmVvWH833azelWkIUbgtnnzD6GRHBvn_Kd_pQ_JC3qRVMdNJ5V_ctThY-yxIXICQHQw1qAWZeOJJO8HuCTX07Yv1oC7tn2fNy2hEAWFtY79WK0VjfeF4A9vsYSwWbEijZaqufk-bQ9Zj1jKYdswtTgopy2pRj"/>
-        <div class="absolute inset-0 bg-gradient-to-t from-surface/90 via-surface/20 to-transparent"></div>
-        <div class="relative h-full p-6 flex flex-col justify-end">
-          <span class="font-label text-primary-fixed text-[10px] mb-2" id="dashboardCurrentCarName">旅行出行</span>
-          <p class="font-headline text-xl font-medium leading-relaxed italic">保持热爱，<br/>奔赴山海。</p>
         </div>
       </div>
       <div class="bg-surface-container rounded-lg p-5 flex flex-col justify-between aspect-square">
@@ -150,35 +142,45 @@
         </div>
       </div>
     </div>
-    <section class="mt-12 py-8 border-t border-outline-variant/10">
+    <section class="page-footer-quote mt-12 py-8 border-t border-outline-variant/10">
       <div class="flex flex-col items-center text-center px-4">
         <span class="material-symbols-outlined text-primary-fixed/30 mb-4 scale-150" data-icon="format_quote">format_quote</span>
-        <p class="font-body font-light text-on-surface-variant italic leading-relaxed text-sm">
+        <p class="font-body font-light text-on-surface-variant italic leading-relaxed text-sm" id="dashboardFooterQuote">
           生活不只是眼前的苟且，<br/>
           还有诗和远方的田野。
         </p>
       </div>
     </section>
+    <section class="app-dashboard-story mt-6">
+      <div class="app-dashboard-story-card relative overflow-hidden rounded-lg min-h-[180px] group">
+        <img alt="Travel" class="absolute inset-0 w-full h-full object-cover grayscale opacity-60 group-hover:grayscale-0 transition-all duration-700" data-alt="dramatic cinematic shot of a luxury off-road vehicle driving on a winding coastal road at sunrise with soft golden light and deep shadows" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmkmPlYMlRxhkCxgP4nxVc6UiLt75q1tLWObW8ywqg-Fh9EbmCNhFt1RFYizEci92_sRPespR9YZaJXf0_9uBrR5Z3-8-2H9-YPhml6ZLPPzFTVk5dmVvWH833azelWkIUbgtnnzD6GRHBvn_Kd_pQ_JC3qRVMdNJ5V_ctThY-yxIXICQHQw1qAWZeOJJO8HuCTX07Yv1oC7tn2fNy2hEAWFtY79WK0VjfeF4A9vsYSwWbEijZaqufk-bQ9Zj1jKYdswtTgopy2pRj"/>
+        <div class="absolute inset-0 bg-gradient-to-t from-surface/90 via-surface/20 to-transparent"></div>
+        <div class="relative h-full p-6 flex flex-col justify-end">
+          <span class="font-label text-primary-fixed text-[10px] mb-2" id="dashboardCurrentCarName">旅行出行</span>
+          <p class="font-headline text-xl font-medium leading-relaxed italic">保持热爱，<br/>奔赴山海。</p>
+        </div>
+      </div>
+    </section>
   </main>
-  <nav class="fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)]">
+  <nav class="app-bottom-nav fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)]">
     <div class="flex justify-around items-center h-20 px-4 pb-safe w-full">
-      <a class="flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
+      <a class="app-nav-link app-nav-link--active flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
         <span class="material-symbols-outlined" data-icon="speed" style="font-variation-settings: 'FILL' 1;">speed</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">看板</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
         <span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">记录</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
         <span class="material-symbols-outlined" data-icon="insights">insights</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">趋势</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
         <span class="material-symbols-outlined" data-icon="history">history</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">历史</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
         <span class="material-symbols-outlined" data-icon="settings">settings</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">设置</span>
       </a>

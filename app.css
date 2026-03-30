@@ -1,5 +1,54 @@
-:root {
+:root,
+html.dark {
   color-scheme: dark;
+  --app-bg: #0e0e0e;
+  --app-text: #ffffff;
+  --app-muted: #adaaaa;
+  --app-card: #1a1a1a;
+  --app-card-strong: #20201f;
+  --app-card-elevated: #262626;
+  --app-line: rgba(255, 255, 255, 0.08);
+  --app-topbar: rgba(14, 14, 14, 0.94);
+  --app-nav: rgba(19, 19, 19, 0.82);
+  --app-nav-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
+  --app-accent: #cafd00;
+  --app-accent-solid: #cafd00;
+  --app-accent-soft: rgba(202, 253, 0, 0.12);
+  --app-accent-shadow: rgba(202, 253, 0, 0.18);
+  --app-accent-on: #516700;
+  --app-secondary: #bf81ff;
+  --app-secondary-soft: rgba(191, 129, 255, 0.12);
+  --app-error: #ff7351;
+  --app-toast-bg: rgba(19, 19, 19, 0.92);
+  --app-toast-text: #ffffff;
+  --app-toast-border: rgba(255, 255, 255, 0.08);
+  --app-focus: #cafd00;
+}
+
+html.light {
+  color-scheme: light;
+  --app-bg: #f4f5ef;
+  --app-text: #171a14;
+  --app-muted: #67705f;
+  --app-card: #ffffff;
+  --app-card-strong: #eef1e6;
+  --app-card-elevated: #e6eadc;
+  --app-line: rgba(23, 26, 20, 0.08);
+  --app-topbar: rgba(244, 245, 239, 0.92);
+  --app-nav: rgba(255, 255, 255, 0.88);
+  --app-nav-shadow: 0 -8px 24px rgba(23, 26, 20, 0.08);
+  --app-accent: #738c00;
+  --app-accent-solid: #d9f045;
+  --app-accent-soft: rgba(115, 140, 0, 0.1);
+  --app-accent-shadow: rgba(115, 140, 0, 0.14);
+  --app-accent-on: #334100;
+  --app-secondary: #7c51bc;
+  --app-secondary-soft: rgba(124, 81, 188, 0.1);
+  --app-error: #c65538;
+  --app-toast-bg: rgba(255, 255, 255, 0.96);
+  --app-toast-text: #171a14;
+  --app-toast-border: rgba(23, 26, 20, 0.08);
+  --app-focus: #738c00;
 }
 
 * {
@@ -8,10 +57,14 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  background: var(--app-bg);
 }
 
 body {
   min-height: max(884px, 100dvh);
+  background: var(--app-bg);
+  color: var(--app-text);
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 [hidden] {
@@ -22,17 +75,162 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.app-shell {
+  background: var(--app-bg) !important;
+  color: var(--app-text) !important;
+}
+
+.app-topbar {
+  background: var(--app-topbar) !important;
+  border-bottom: 1px solid var(--app-line);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.app-bottom-nav {
+  background: var(--app-nav) !important;
+  box-shadow: var(--app-nav-shadow) !important;
+  border-top: 1px solid var(--app-line);
+}
+
+.app-main {
+  padding-top: calc(5rem + env(safe-area-inset-top)) !important;
+  padding-bottom: calc(7.25rem + env(safe-area-inset-bottom)) !important;
+}
+
+.app-page-hero {
+  margin-top: 0.5rem !important;
+  margin-bottom: 2rem !important;
+}
+
+.page-footer-quote {
+  margin-top: 2rem !important;
+  padding-top: 1.25rem !important;
+  padding-bottom: 0.25rem !important;
+}
+
+.page-footer-quote--logs {
+  margin-top: 2.75rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.page-footer-quote-card {
+  margin-top: 2rem !important;
+}
+
+.app-dashboard-story {
+  margin-bottom: 0.5rem;
+}
+
+.app-nav-link {
+  color: var(--app-muted) !important;
+}
+
+.app-nav-link:hover {
+  color: var(--app-text) !important;
+}
+
+.app-nav-link--active {
+  color: var(--app-accent) !important;
+}
+
+.app-shell .bg-surface-container,
+.app-shell .bg-surface-container-lowest {
+  background-color: var(--app-card) !important;
+}
+
+.app-shell .bg-surface-container-high,
+.app-shell .bg-surface-container-low {
+  background-color: var(--app-card-strong) !important;
+}
+
+.app-shell .bg-surface-container-highest {
+  background-color: var(--app-card-elevated) !important;
+}
+
+.app-shell .text-on-surface,
+.app-shell .text-white,
+.app-shell .text-black {
+  color: var(--app-text) !important;
+}
+
+.app-shell .text-on-surface-variant,
+.app-shell .text-\[\#adaaaa\] {
+  color: var(--app-muted) !important;
+}
+
+.app-shell .text-primary-fixed,
+.app-shell .text-\[\#cafd00\] {
+  color: var(--app-accent) !important;
+}
+
+.app-shell .text-tertiary-fixed {
+  color: var(--app-accent) !important;
+}
+
+.app-shell .text-secondary {
+  color: var(--app-secondary) !important;
+}
+
+.app-shell .text-error {
+  color: var(--app-error) !important;
+}
+
+.app-shell [class*="text-on-surface/90"] {
+  color: var(--app-text) !important;
+  opacity: 0.9;
+}
+
+.app-shell .bg-primary-fixed,
+.app-shell .bg-\[\#cafd00\] {
+  background-color: var(--app-accent-solid) !important;
+}
+
+.app-shell .text-on-primary-fixed {
+  color: var(--app-accent-on) !important;
+}
+
+.app-shell [class*="bg-primary-fixed/10"] {
+  background-color: var(--app-accent-soft) !important;
+}
+
+.app-shell [class*="bg-primary-fixed/20"] {
+  background-color: var(--app-accent-soft) !important;
+}
+
+.app-shell [class*="bg-secondary/10"] {
+  background-color: var(--app-secondary-soft) !important;
+}
+
+.app-shell [class*="text-primary-fixed/30"] {
+  color: var(--app-accent) !important;
+  opacity: 0.3;
+}
+
+.app-shell [class*="border-outline-variant/10"],
+.app-shell [class*="border-outline-variant/20"],
+.app-shell [class*="border-white/5"],
+.app-shell [class*="border-white/50"] {
+  border-color: var(--app-line) !important;
+}
+
+.app-shell input,
+.app-shell textarea,
+.app-shell button {
+  color: inherit;
+}
+
 .toggle-pill {
   transition: all 180ms ease;
 }
 
 .toggle-pill--active {
-  background: #cafd00;
-  color: #516700;
+  background: var(--app-accent-solid);
+  color: var(--app-accent-on);
 }
 
 .toggle-pill--inactive {
-  color: #adaaaa;
+  color: var(--app-muted);
 }
 
 .fuel-option {
@@ -40,14 +238,14 @@ body {
 }
 
 .fuel-option--active {
-  background: #cafd00;
-  color: #516700;
-  box-shadow: 0 0 20px rgba(202, 253, 0, 0.2);
+  background: var(--app-accent-solid);
+  color: var(--app-accent-on);
+  box-shadow: 0 0 20px var(--app-accent-shadow);
 }
 
 .fuel-option--inactive {
-  background: #262626;
-  color: #ffffff;
+  background: var(--app-card-elevated);
+  color: var(--app-text);
   border: 1px solid transparent;
 }
 
@@ -61,8 +259,12 @@ body {
   padding: 0;
 }
 
-.app-card-button:focus-visible {
-  outline: 2px solid #cafd00;
+.app-card-button:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--app-focus);
   outline-offset: 3px;
 }
 
@@ -80,13 +282,13 @@ body {
   opacity: 0;
   transform: translateY(0.75rem);
   transition: opacity 180ms ease, transform 180ms ease;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--app-toast-border);
   border-radius: 1rem;
-  background: rgba(19, 19, 19, 0.92);
-  color: #ffffff;
+  background: var(--app-toast-bg);
+  color: var(--app-toast-text);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.16);
   padding: 0.9rem 1rem;
   font-size: 0.875rem;
   line-height: 1.4;

@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0, viewport-fit=cover" name="viewport"/>
-  <meta content="#0e0e0e" name="theme-color"/>
+  <meta content="#0e0e0e" id="themeColorMeta" name="theme-color"/>
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>趋势 - 加油记录 V3.4</title>
+  <title>趋势 - 加油记录 V3.5</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -97,8 +97,8 @@
       }
     </style>
 </head>
-<body class="font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="stats">
-  <header class="fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e]">
+<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="stats">
+  <header class="app-topbar fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e]">
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-2">
         <span class="material-symbols-outlined text-[#cafd00]" data-icon="insights">insights</span>
@@ -109,8 +109,8 @@
       </button>
     </div>
   </header>
-  <main class="pt-24 pb-32 px-6 max-w-md mx-auto min-h-screen">
-    <section class="mb-12">
+  <main class="app-main px-6 max-w-md mx-auto min-h-screen">
+    <section class="app-page-hero mb-12">
       <p class="font-label text-on-surface-variant text-[0.75rem] font-bold uppercase tracking-widest mb-2">本月支出总额</p>
       <div class="flex items-baseline gap-1">
         <span class="text-on-surface-variant text-2xl font-light">¥</span>
@@ -121,7 +121,7 @@
       <div class="col-span-2 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden">
         <div class="relative w-48 h-48 flex items-center justify-center">
           <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" fill="transparent" r="40" stroke="#262626" stroke-width="8"></circle>
+            <circle cx="50" cy="50" fill="transparent" id="statsBaseArc" r="40" stroke="#262626" stroke-width="8"></circle>
             <circle cx="50" cy="50" fill="transparent" id="statsFuelArc" r="40" stroke="#cafd00" stroke-dasharray="251.2" stroke-dashoffset="100.48" stroke-linecap="round" stroke-width="8"></circle>
             <circle cx="50" cy="50" fill="transparent" id="statsOtherArc" r="40" stroke="#bf81ff" stroke-dasharray="251.2" stroke-dashoffset="210" stroke-linecap="round" stroke-width="8"></circle>
           </svg>
@@ -214,12 +214,12 @@
         </div>
       </div>
     </section>
-    <section class="mt-8">
+    <section class="page-footer-quote-card mt-8">
       <div class="bg-gradient-to-br from-surface-container to-surface-container-low rounded-xl p-8 border border-white/5 relative overflow-hidden group">
         <div class="absolute -right-8 -bottom-8 opacity-10 group-hover:opacity-20 transition-opacity">
           <span class="material-symbols-outlined text-[120px]" data-icon="auto_awesome">auto_awesome</span>
         </div>
-        <p class="font-headline text-lg italic text-on-surface/90 leading-relaxed relative z-10">
+        <p class="font-headline text-lg italic text-on-surface/90 leading-relaxed relative z-10" id="statsFooterQuote">
           “ 油箱满了，心情也满了。路在脚下，心在远方。 ”
         </p>
         <div class="mt-4 flex items-center gap-2 relative z-10">
@@ -229,25 +229,25 @@
       </div>
     </section>
   </main>
-  <nav class="fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)] no-border tonal-shift">
+  <nav class="app-bottom-nav fixed bottom-0 left-0 w-full z-50 rounded-t-[2rem] bg-[#131313]/80 backdrop-blur-xl shadow-[0px_-8px_24px_rgba(0,0,0,0.5)] no-border tonal-shift">
     <div class="flex justify-around items-center h-20 px-4 pb-safe w-full">
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
         <span class="material-symbols-outlined" data-icon="speed">speed</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">看板</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
         <span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">记录</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
+      <a class="app-nav-link app-nav-link--active flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
         <span class="material-symbols-outlined" data-icon="insights" style="font-variation-settings: 'FILL' 1;">insights</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">趋势</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
         <span class="material-symbols-outlined" data-icon="history">history</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">历史</span>
       </a>
-      <a class="flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
+      <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
         <span class="material-symbols-outlined" data-icon="settings">settings</span>
         <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">设置</span>
       </a>
