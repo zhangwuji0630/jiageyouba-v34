@@ -122,6 +122,18 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.app-dashboard-story-card {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.app-dashboard-story-card h3 {
+  color: #ffffff !important;
+}
+
+.app-dashboard-story-card p {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
 .app-nav-link {
   color: var(--app-muted) !important;
 }
@@ -211,6 +223,11 @@ body {
 .app-shell [class*="border-outline-variant/20"],
 .app-shell [class*="border-white/5"],
 .app-shell [class*="border-white/50"] {
+  border-color: var(--app-line) !important;
+}
+
+.app-quote-card {
+  background: linear-gradient(135deg, var(--app-card) 0%, var(--app-card-strong) 100%) !important;
   border-color: var(--app-line) !important;
 }
 
