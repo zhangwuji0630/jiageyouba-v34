@@ -24,11 +24,17 @@ const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
 const APP_VERSION = "3.6.0";
-const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
+const APP_CONFIG =
+  typeof window === "undefined" ? {} : Object.freeze(window.__JIAGEYOUBA_CONFIG__ || {});
+const APP_BASE_URL =
+  typeof window === "undefined" ? new URL("https://example.invalid/") : new URL("./", window.location.href);
+const LOCAL_SUPABASE_SCRIPT_URL = "./vendor/supabase-js.min.js";
+const SUPABASE_URL = APP_CONFIG.supabaseUrl || "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
-const SUPABASE_REDIRECT_URL = "https://zhangwuji0630.github.io/jiageyouba-v34/settings.html";
+const SUPABASE_REDIRECT_URL = APP_CONFIG.supabaseRedirectUrl || new URL("settings.html", APP_BASE_URL).toString();
 const CLOUD_TABLE = "user_snapshots";
 const CLOUD_SYNC_DEBOUNCE_MS = 500;
+const CLOUD_REQUEST_TIMEOUT_MS = 8000;
 
 const DEFAULT_VEHICLE_TEMPLATES = Object.freeze([
   {
@@ -179,8 +185,10 @@ const cloudState = {
   session: null,
   user: null,
   authBound: false,
+  libraryPromise: null,
   syncInFlight: false,
   syncQueued: false,
+  lastError: "",
 };
 
 function createId(prefix = "id") {
@@ -216,6 +224,46 @@ function formatNumber(value, digits = 2) {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(asNumber(value));
+}
+
+function withTimeout(promise, timeoutMs, message) {
+  let timer = 0;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    window.clearTimeout(timer);
+  });
+}
+
+function getCloudUnavailableMessage(error) {
+  const rawMessage = error instanceof Error ? error.message : String(error || "");
+  if (
+    rawMessage.includes(CLOUD_TABLE) ||
+    rawMessage.includes("relation") ||
+    rawMessage.includes("schema cache")
+  ) {
+    return "云同步表尚未初始化，请先执行 supabase/setup.sql";
+  }
+
+  if (
+    rawMessage.includes("timeout") ||
+    rawMessage.includes("超时") ||
+    rawMessage.includes("Failed to fetch") ||
+    rawMessage.includes("Load failed")
+  ) {
+    return "云同步网络较慢或暂不可用，当前保持本地模式";
+  }
+
+  return "云同步暂不可用，当前保持本地模式";
+}
+
+function setCloudError(error) {
+  cloudState.lastError = getCloudUnavailableMessage(error);
+}
+
+function clearCloudError() {
+  cloudState.lastError = "";
 }
 
 function formatInteger(value) {
@@ -878,14 +926,55 @@ function shouldPushLocalSnapshot(localSnapshot, remoteEnvelope, userId) {
   return localUpdatedAt > remoteUpdatedAt;
 }
 
+async function ensureSupabaseLibrary() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (typeof window.supabase?.createClient === "function") {
+    clearCloudError();
+    return true;
+  }
+
+  if (!cloudState.libraryPromise) {
+    cloudState.libraryPromise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector(`script[src="${LOCAL_SUPABASE_SCRIPT_URL}"]`);
+      if (existingScript) {
+        existingScript.addEventListener("load", () => resolve(true), { once: true });
+        existingScript.addEventListener("error", () => reject(new Error("云同步组件加载失败")), {
+          once: true,
+        });
+        return;
+      }
+
+      const script = document.createElement("script");
+      script.src = LOCAL_SUPABASE_SCRIPT_URL;
+      script.async = true;
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error("云同步组件加载失败"));
+      document.head.appendChild(script);
+    }).catch((error) => {
+      cloudState.libraryPromise = null;
+      setCloudError(error);
+      throw error;
+    });
+  }
+
+  await withTimeout(cloudState.libraryPromise, CLOUD_REQUEST_TIMEOUT_MS, "云同步组件加载超时");
+  clearCloudError();
+  return true;
+}
+
 async function ensureSupabaseClient() {
   if (cloudState.client) {
     return cloudState.client;
   }
 
-  if (typeof window === "undefined" || typeof window.supabase?.createClient !== "function") {
+  if (typeof window === "undefined") {
     return null;
   }
+
+  await ensureSupabaseLibrary();
 
   cloudState.client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
     auth: {
@@ -911,23 +1000,31 @@ async function ensureSupabaseClient() {
     });
   }
 
-  const { data, error } = await cloudState.client.auth.getSession();
+  const { data, error } = await withTimeout(
+    cloudState.client.auth.getSession(),
+    CLOUD_REQUEST_TIMEOUT_MS,
+    "云同步会话获取超时"
+  );
   if (error) {
+    setCloudError(error);
     throw error;
   }
 
   cloudState.session = data.session || null;
   cloudState.user = data.session?.user || null;
+  clearCloudError();
   return cloudState.client;
 }
 
 async function fetchRemoteSnapshotEnvelope(client) {
-  const { data, error } = await client
-    .from(CLOUD_TABLE)
-    .select("snapshot, updated_at")
-    .maybeSingle();
+  const { data, error } = await withTimeout(
+    client.from(CLOUD_TABLE).select("snapshot, updated_at").maybeSingle(),
+    CLOUD_REQUEST_TIMEOUT_MS,
+    "云同步读取超时"
+  );
 
   if (error) {
+    setCloudError(error);
     throw error;
   }
 
@@ -935,6 +1032,7 @@ async function fetchRemoteSnapshotEnvelope(client) {
     return null;
   }
 
+  clearCloudError();
   return {
     snapshot: normalizeSnapshot(data.snapshot || {}),
     updatedAt: String(data.updated_at || ""),
@@ -949,6 +1047,7 @@ async function renderCloudAuthState(snapshot = null) {
 
   const hintElement = document.getElementById("cloudAuthHint");
   const syncElement = document.getElementById("cloudLastSyncStatus");
+  const modeElement = document.getElementById("cloudModeStatus");
   const emailInput = document.getElementById("cloudEmail");
   const passwordInput = document.getElementById("cloudPassword");
   const signUpButton = document.getElementById("cloudSignUpButton");
@@ -964,10 +1063,15 @@ async function renderCloudAuthState(snapshot = null) {
 
   const isSignedIn = Boolean(cloudState.user);
   const lastSyncedAt = getMetaValue(nextSnapshot, CLOUD_META_KEYS.lastSyncedAt);
+  const isCloudDegraded = Boolean(cloudState.lastError);
 
   statusElement.textContent = isSignedIn ? `已登录：${userEmail}` : "未登录云同步";
   if (hintElement) {
-    hintElement.textContent = isSignedIn ? "当前账号已连接，可在重装 PWA 后恢复这套数据" : "登录后可在重装 PWA 后恢复车辆与记录";
+    hintElement.textContent = isCloudDegraded
+      ? cloudState.lastError
+      : isSignedIn
+        ? "当前账号已连接，可在重装 PWA 后恢复这套数据"
+        : "登录后可在重装 PWA 后恢复车辆与记录";
   }
 
   if (syncElement) {
@@ -978,6 +1082,15 @@ async function renderCloudAuthState(snapshot = null) {
     } else {
       syncElement.textContent = "最近云同步：未开始";
     }
+  }
+
+  if (modeElement) {
+    modeElement.dataset.state = isCloudDegraded ? "degraded" : isSignedIn ? "connected" : "local";
+    modeElement.textContent = isCloudDegraded
+      ? "当前模式：本地模式"
+      : isSignedIn
+        ? "当前模式：云同步已连接"
+        : "当前模式：本地优先";
   }
 
   if (emailInput) {
@@ -1013,6 +1126,7 @@ function scheduleCloudSync(reason, options = {}) {
 async function syncCloudSnapshot(options = {}) {
   const client = await ensureSupabaseClient().catch((error) => {
     console.error(error);
+    setCloudError(error);
     return null;
   });
 
@@ -1053,16 +1167,18 @@ async function syncCloudSnapshot(options = {}) {
       app_version: APP_VERSION,
     };
 
-    const { data, error } = await client
-      .from(CLOUD_TABLE)
-      .upsert(payload, { onConflict: "user_id" })
-      .select("updated_at")
-      .single();
+    const { data, error } = await withTimeout(
+      client.from(CLOUD_TABLE).upsert(payload, { onConflict: "user_id" }).select("updated_at").single(),
+      CLOUD_REQUEST_TIMEOUT_MS,
+      "云同步写入超时"
+    );
 
     if (error) {
+      setCloudError(error);
       throw error;
     }
 
+    clearCloudError();
     localSnapshot = applyCloudMeta(localSnapshot, userId, String(data?.updated_at || nowIso()));
     const savedSnapshot = await saveSnapshot(localSnapshot, [], { skipCloud: true });
     await renderCloudAuthState(savedSnapshot);
@@ -1074,14 +1190,9 @@ async function syncCloudSnapshot(options = {}) {
     return savedSnapshot;
   } catch (error) {
     console.error(error);
+    setCloudError(error);
     if (!options.silent) {
-      const message = error instanceof Error ? error.message : String(error || "");
-      showToast(
-        message.includes(CLOUD_TABLE) || message.includes("relation") || message.includes("schema cache")
-          ? "云同步表尚未初始化，请先执行 supabase/setup.sql"
-          : "云同步失败，请稍后重试",
-        "warning"
-      );
+      showToast(getCloudUnavailableMessage(error), "warning");
     }
     return null;
   } finally {
@@ -1555,9 +1666,7 @@ function registerServiceWorker() {
     return;
   }
 
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./service-worker.js").catch(() => {});
-  });
+  navigator.serviceWorker.register("./service-worker.js").catch(() => {});
 }
 
 function bindThemeEntryPoints() {
@@ -2409,9 +2518,10 @@ async function initSettingsPage(snapshot) {
       return;
     }
 
-    const client = await ensureSupabaseClient();
+    const client = await ensureSupabaseClient().catch(() => null);
     if (!client) {
-      showToast("云同步组件加载失败，请刷新重试", "warning");
+      showToast("云同步暂不可用，当前保持本地模式", "warning");
+      await renderCloudAuthState(await loadSnapshot());
       return;
     }
 
@@ -2449,9 +2559,10 @@ async function initSettingsPage(snapshot) {
       return;
     }
 
-    const client = await ensureSupabaseClient();
+    const client = await ensureSupabaseClient().catch(() => null);
     if (!client) {
-      showToast("云同步组件加载失败，请刷新重试", "warning");
+      showToast("云同步暂不可用，当前保持本地模式", "warning");
+      await renderCloudAuthState(await loadSnapshot());
       return;
     }
 
@@ -2476,9 +2587,10 @@ async function initSettingsPage(snapshot) {
   });
 
   cloudSignOutButton?.addEventListener("click", async () => {
-    const client = await ensureSupabaseClient();
+    const client = await ensureSupabaseClient().catch(() => null);
     if (!client) {
-      showToast("云同步组件加载失败，请刷新重试", "warning");
+      showToast("云同步暂不可用，当前保持本地模式", "warning");
+      await renderCloudAuthState(await loadSnapshot());
       return;
     }
 
@@ -2509,18 +2621,22 @@ async function initSettingsPage(snapshot) {
 }
 
 async function initPage() {
+  const activePage = document.body.dataset.page || "";
   applyTheme(readCachedThemeMode());
   bindSystemThemeWatcher();
   registerServiceWorker();
   await bootstrapDatabase();
-  await ensureSupabaseClient().catch((error) => {
-    console.error(error);
-  });
+  if (activePage === "settings") {
+    await ensureSupabaseClient().catch((error) => {
+      console.error(error);
+      setCloudError(error);
+    });
+  }
   bindThemeEntryPoints();
   showFlash();
 
   let snapshot = await loadSnapshot();
-  if (cloudState.user) {
+  if (activePage === "settings" && cloudState.user) {
     snapshot = (await syncCloudSnapshot({ reason: "startup-sync", silent: true })) || snapshot;
   }
   applyTheme(snapshot.settings.theme);
