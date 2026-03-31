@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>设置 - 加油记录 V3.6.0</title>
+  <title>设置 - 加油记录 V3.6.2</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -112,18 +112,20 @@
     <section>
       <div class="flex justify-between items-end mb-6">
         <h2 class="font-headline font-medium text-[1.75rem] text-on-surface">我的车库</h2>
-        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.6.0</span>
+        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.6.2</span>
       </div>
       <div class="grid grid-cols-2 gap-4">
-        <div class="col-span-2 bg-surface-container rounded-lg p-6 relative overflow-hidden group cursor-pointer" id="currentCarCard">
-          <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-            <span class="material-symbols-outlined text-8xl" data-icon="directions_car">directions_car</span>
+        <div class="col-span-2 app-quote-card rounded-lg p-6 relative overflow-hidden group cursor-pointer border border-white/5" id="currentCarCard">
+          <div class="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,18,26,0.92)_0%,rgba(6,18,26,0.86)_34%,rgba(16,112,132,0.18)_100%)]"></div>
+          <div class="absolute inset-y-0 right-0 w-[46%]">
+            <div class="absolute inset-0 bg-gradient-to-r from-surface-container via-surface-container/20 to-transparent"></div>
+            <img alt="当前车辆插画" class="app-current-car-card__image absolute inset-y-0 right-0 h-full w-full object-contain object-right-bottom opacity-90 transition-transform duration-500 group-hover:scale-[1.03]" id="settingsCurrentCarArtwork" src="./assets/vehicle-art/sedan-blue.svg"/>
           </div>
-          <div class="relative z-10">
+          <div class="relative z-10 max-w-[58%]">
             <p class="font-label text-[10px] text-on-surface-variant uppercase mb-1 tracking-widest">当前驾驶</p>
             <h3 class="font-headline text-lg font-bold" id="settingsCurrentCarName">保时捷 911 GT3</h3>
             <p class="font-body text-sm font-thin text-on-surface-variant mt-1" id="settingsCurrentCarPlate">沪A · 911GT3</p>
-            <div class="mt-8 flex items-center gap-2">
+            <div class="mt-8 flex items-center gap-2 flex-wrap">
               <span class="px-3 py-1 bg-primary-fixed/10 text-primary-fixed rounded-full text-[10px] font-bold">主用车</span>
             </div>
           </div>
@@ -216,7 +218,7 @@
             <p class="text-on-surface-variant text-[11px] font-thin mt-2" id="cloudLastSyncStatus">最近云同步：未开始</p>
           </div>
         </div>
-        <div class="grid gap-3">
+        <div class="grid gap-3" id="cloudSignedOutPanel">
           <label class="app-field">
             <span class="app-field__label">邮箱</span>
             <input autocomplete="email" class="app-input" id="cloudEmail" placeholder="输入登录邮箱" type="email"/>
@@ -257,8 +259,7 @@
     </section>
     <section class="page-footer-quote py-12 text-center">
       <p class="text-on-surface-variant font-body font-thin italic tracking-widest text-sm opacity-60" id="settingsFooterQuote">
-        保持热爱，奔赴山海
-      </p>
+        保持热爱，奔赴山海      </p>
       <div class="mt-4 flex justify-center gap-1">
         <div class="w-1 h-1 rounded-full bg-outline-variant"></div>
         <div class="w-1 h-1 rounded-full bg-outline-variant"></div>
@@ -294,3 +295,4 @@
   <script defer src="./app.js"></script>
 </body>
 </html>
+

@@ -16,14 +16,16 @@ const LEGACY_STORAGE_KEYS = Object.freeze({
 });
 
 const CATEGORY_ORDER = ["fuel", "maintenance", "wash", "repair", "accessory", "decoration"];
+const PRIMARY_RECORD_KINDS = ["fuel", "repair", "maintenance", "wash", "accessory"];
 const NON_FUEL_KINDS = CATEGORY_ORDER.filter((kind) => kind !== "fuel");
+const ODOMETER_REQUIRED_KINDS = ["fuel", "maintenance"];
 const FUEL_TYPES = ["92#", "95#", "98#"];
 const MILES_PER_KM = 0.621371;
 const DONUT_CIRCUMFERENCE = 251.2;
 const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.6.2";
 const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
 const SUPABASE_REDIRECT_URL = "https://zhangwuji0630.github.io/jiageyouba-v34/settings.html";
@@ -56,6 +58,35 @@ const CATEGORY_META = Object.freeze({
   repair: { label: "维修" },
   accessory: { label: "配件" },
   decoration: { label: "配饰" },
+});
+
+const WASH_TYPE_META = Object.freeze({
+  premium: {
+    label: "精选洗车",
+    shortLabel: "精选",
+  },
+  basic: {
+    label: "普洗",
+    shortLabel: "普洗",
+  },
+});
+
+const VEHICLE_ART_LIBRARY = Object.freeze({
+  coupe: {
+    src: "./assets/vehicle-art/coupe-blue.svg",
+    alt: "青蓝色动漫风跑车插画",
+    mood: "AQUA GT",
+  },
+  offroad: {
+    src: "./assets/vehicle-art/offroad-blue.svg",
+    alt: "青蓝色动漫风越野车插画",
+    mood: "COAST DEFENDER",
+  },
+  sedan: {
+    src: "./assets/vehicle-art/sedan-blue.svg",
+    alt: "青蓝色动漫风轿跑插画",
+    mood: "AQUA DRIVE",
+  },
 });
 
 const NON_FUEL_FORM_META = Object.freeze({
@@ -955,19 +986,47 @@ async function renderCloudAuthState(snapshot = null) {
   const signInButton = document.getElementById("cloudSignInButton");
   const syncButton = document.getElementById("cloudSyncButton");
   const signOutButton = document.getElementById("cloudSignOutButton");
+  const signedOutPanel = document.getElementById("cloudSignedOutPanel");
+  const signedInPanel = document.getElementById("cloudSignedInPanel");
+  const signedInEmail = document.getElementById("cloudSignedInEmail");
+  const emailField = emailInput?.closest(".app-field");
+  const passwordField = passwordInput?.closest(".app-field");
   const nextSnapshot = snapshot || (await loadSnapshot());
   const userEmail = cloudState.user?.email || "";
+  const isLightTheme = document.documentElement.classList.contains("light");
+  const inputBackground = isLightTheme ? "#ffffff" : "#20201f";
+  const inputColor = isLightTheme ? "#171a14" : "#ffffff";
+
+  [signUpButton, signInButton, syncButton, signOutButton].forEach((button) => {
+    if (!button) {
+      return;
+    }
+    button.classList.remove("app-action-button");
+    button.classList.add("app-secondary-button");
+  });
 
   if (emailInput && userEmail) {
     emailInput.value = userEmail;
   }
 
+  [emailInput, passwordInput].forEach((input) => {
+    if (!input) {
+      return;
+    }
+    input.style.backgroundColor = inputBackground;
+    input.style.boxShadow = `0 0 0 1000px ${inputBackground} inset`;
+    input.style.setProperty("-webkit-box-shadow", `0 0 0 1000px ${inputBackground} inset`);
+    input.style.color = inputColor;
+    input.style.caretColor = inputColor;
+    input.style.setProperty("-webkit-text-fill-color", inputColor);
+  });
+
   const isSignedIn = Boolean(cloudState.user);
   const lastSyncedAt = getMetaValue(nextSnapshot, CLOUD_META_KEYS.lastSyncedAt);
 
-  statusElement.textContent = isSignedIn ? `已登录：${userEmail}` : "未登录云同步";
+  statusElement.textContent = isSignedIn ? `当前账号：${userEmail}` : "未登录云同步";
   if (hintElement) {
-    hintElement.textContent = isSignedIn ? "当前账号已连接，可在重装 PWA 后恢复这套数据" : "登录后可在重装 PWA 后恢复车辆与记录";
+    hintElement.textContent = isSignedIn ? "登录表单已收起，可直接同步当前账号数据或退出登录" : "登录后可在重装 PWA 后恢复车辆与记录";
   }
 
   if (syncElement) {
@@ -978,6 +1037,36 @@ async function renderCloudAuthState(snapshot = null) {
     } else {
       syncElement.textContent = "最近云同步：未开始";
     }
+  }
+
+  if (signedInEmail) {
+    signedInEmail.textContent = userEmail || "--";
+  }
+
+  if (signedOutPanel && signedInPanel) {
+    signedOutPanel.hidden = isSignedIn;
+    signedInPanel.hidden = !isSignedIn;
+  } else if (signedOutPanel) {
+    signedOutPanel.hidden = isSignedIn;
+  }
+
+  if (emailField) {
+    emailField.hidden = isSignedIn;
+  }
+  if (passwordField) {
+    passwordField.hidden = isSignedIn;
+  }
+  if (signUpButton) {
+    signUpButton.hidden = isSignedIn;
+  }
+  if (signInButton) {
+    signInButton.hidden = isSignedIn;
+  }
+  if (syncButton) {
+    syncButton.hidden = !isSignedIn;
+  }
+  if (signOutButton) {
+    signOutButton.hidden = !isSignedIn;
   }
 
   if (emailInput) {
@@ -1300,8 +1389,89 @@ function isNonFuelKind(kind) {
   return NON_FUEL_KINDS.includes(kind);
 }
 
+function isEditableRecordKind(kind) {
+  return CATEGORY_ORDER.includes(kind);
+}
+
+function isPrimaryRecordKind(kind) {
+  return PRIMARY_RECORD_KINDS.includes(kind);
+}
+
+function isOdometerRequiredKind(kind) {
+  return ODOMETER_REQUIRED_KINDS.includes(kind);
+}
+
 function getNonFuelFormMeta(kind) {
   return NON_FUEL_FORM_META[kind] || NON_FUEL_FORM_META.maintenance;
+}
+
+function normalizeWashType(value) {
+  return value === "basic" ? "basic" : "premium";
+}
+
+function getWashTypeMeta(value) {
+  return WASH_TYPE_META[normalizeWashType(value)] || WASH_TYPE_META.premium;
+}
+
+function getWashTypeFromRecord(record) {
+  return normalizeWashType(record?.payload?.washType);
+}
+
+function getDefaultGenericTitle(kind, options = {}) {
+  if (kind === "wash") {
+    return getWashTypeMeta(options.washType).label;
+  }
+  return getNonFuelFormMeta(kind).defaultTitle;
+}
+
+function isDefaultGenericTitle(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return true;
+  }
+
+  return (
+    Object.values(NON_FUEL_FORM_META).some((meta) => meta.defaultTitle === text) ||
+    Object.values(WASH_TYPE_META).some((meta) => meta.label === text) ||
+    Object.values(CATEGORY_META).some((meta) => meta.label === text)
+  );
+}
+
+function getCostPerDistance(monthlySpend, monthlyDistanceKm, unitMode) {
+  const scopedDistance = unitMode === "imperial" ? monthlyDistanceKm * MILES_PER_KM : monthlyDistanceKm;
+  return scopedDistance > 0 ? monthlySpend / scopedDistance : 0;
+}
+
+function getCostPerDistanceLabel(unitMode) {
+  return unitMode === "imperial" ? "每英里花费" : "每公里花费";
+}
+
+function getCostPerDistanceUnit(unitMode) {
+  return unitMode === "imperial" ? "CNY / MI" : "CNY / KM";
+}
+
+function getVehicleArtworkMeta(vehicleName = "") {
+  const label = String(vehicleName || "");
+  if (/911|GT3|保时捷|Cayman|Supra|跑车/i.test(label)) {
+    return VEHICLE_ART_LIBRARY.coupe;
+  }
+  if (/路虎|卫士|Defender|SUV|越野|Jeep/i.test(label)) {
+    return VEHICLE_ART_LIBRARY.offroad;
+  }
+  return VEHICLE_ART_LIBRARY.sedan;
+}
+
+function getHistoryFilterKind() {
+  const kind = new URLSearchParams(window.location.search).get("kind");
+  return isEditableRecordKind(kind) ? kind : "";
+}
+
+function buildLogsUrl(kind = "") {
+  return kind && isEditableRecordKind(kind) ? `./logs.html?kind=${encodeURIComponent(kind)}` : "./logs.html";
+}
+
+function buildAddUrl(kind = "") {
+  return kind && kind !== "fuel" && isEditableRecordKind(kind) ? `./add.html?kind=${encodeURIComponent(kind)}` : "./add.html";
 }
 
 function readCachedThemeMode() {
@@ -1568,6 +1738,98 @@ function bindThemeEntryPoints() {
   });
 }
 
+function ensureDashboardMiniCardsLayout() {
+  const spendCard = document.getElementById("dashboardMonthlySpend")?.closest(".bg-surface-container");
+  const mileageCard = document.getElementById("dashboardMonthlyMileage")?.closest(".bg-surface-container");
+  const efficiencyCard = document.getElementById("dashboardAvgEfficiency")?.closest(".bg-surface-container");
+
+  if (!spendCard || !mileageCard || !efficiencyCard) {
+    return;
+  }
+
+  let row = document.getElementById("dashboardMiniCardsRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "dashboardMiniCardsRow";
+    row.className = "col-span-2 grid grid-cols-3 gap-3";
+    spendCard.insertAdjacentElement("afterend", row);
+  }
+
+  [mileageCard, efficiencyCard].forEach((card) => {
+    card.className = "bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between";
+    card.classList.remove("aspect-square");
+    row.appendChild(card);
+  });
+
+  let costCard = document.getElementById("dashboardCostPerDistanceCard");
+  if (!costCard) {
+    costCard = document.createElement("div");
+    costCard.id = "dashboardCostPerDistanceCard";
+    costCard.className = "bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between";
+    costCard.innerHTML = `
+      <span class="material-symbols-outlined text-primary-fixed text-2xl" data-icon="payments">payments</span>
+      <div>
+        <span class="font-label text-on-surface-variant text-[10px] uppercase block mb-1" id="dashboardCostPerDistanceLabel">每公里花费</span>
+        <div class="font-headline text-2xl font-bold" id="dashboardCostPerDistance">0.00</div>
+        <span class="font-label text-on-surface-variant text-[10px]" id="dashboardCostPerDistanceUnit">CNY / KM</span>
+      </div>
+    `;
+  }
+
+  row.appendChild(costCard);
+}
+
+function ensureLogsHeaderElements() {
+  const hero = document.querySelector('.app-shell[data-page="logs"] .app-page-hero');
+  if (!hero) {
+    return {};
+  }
+
+  let kicker = document.getElementById("logsHeroKicker");
+  if (!kicker) {
+    kicker = hero.querySelector("p");
+    if (kicker) {
+      kicker.id = "logsHeroKicker";
+    }
+  }
+
+  let hint = document.getElementById("logsHeroHint");
+  if (!hint) {
+    hint = document.createElement("p");
+    hint.id = "logsHeroHint";
+    hint.className = "text-on-surface-variant text-xs font-thin mt-3";
+    const amountWrap = hero.querySelector(".flex.items-baseline.gap-2");
+    amountWrap?.insertAdjacentElement("afterend", hint);
+  }
+
+  let action = document.getElementById("logsScopeAction");
+  if (!action) {
+    action = document.createElement("a");
+    action.id = "logsScopeAction";
+    action.className = "hidden inline-flex mt-3 text-secondary font-label text-[0.75rem] font-bold uppercase";
+    action.href = "./logs.html";
+    hero.appendChild(action);
+  }
+
+  return { kicker, hint, action };
+}
+
+function ensureCurrentCarArtwork() {
+  const currentCarCard = document.getElementById("currentCarCard");
+  if (!currentCarCard || document.getElementById("settingsCurrentCarArtwork")) {
+    return;
+  }
+
+  currentCarCard.classList.add("app-quote-card", "border", "border-white/5");
+  const media = document.createElement("div");
+  media.className = "absolute inset-y-0 right-0 w-[46%]";
+  media.innerHTML = `
+    <div class="absolute inset-0 bg-gradient-to-r from-surface-container via-surface-container/20 to-transparent"></div>
+    <img alt="当前车辆插画" class="app-current-car-card__image absolute inset-y-0 right-0 h-full w-full object-contain object-right-bottom opacity-90" id="settingsCurrentCarArtwork" src="./assets/vehicle-art/sedan-blue.svg"/>
+  `;
+  currentCarCard.prepend(media);
+}
+
 function setFuelButtons(activeFuelType) {
   document.querySelectorAll("[data-fuel-type]").forEach((button) => {
     const isActive = button.dataset.fuelType === activeFuelType;
@@ -1590,6 +1852,16 @@ function applyUnitToggleStyles(activeUnit) {
 function setRecordKindButtons(activeKind) {
   document.querySelectorAll("[data-record-kind]").forEach((button) => {
     const isActive = button.dataset.recordKind === activeKind;
+    button.classList.add("fuel-option");
+    button.classList.toggle("fuel-option--active", isActive);
+    button.classList.toggle("fuel-option--inactive", !isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+function setWashButtons(activeWashType) {
+  document.querySelectorAll("[data-wash-type]").forEach((button) => {
+    const isActive = button.dataset.washType === activeWashType;
     button.classList.add("fuel-option");
     button.classList.toggle("fuel-option--active", isActive);
     button.classList.toggle("fuel-option--inactive", !isActive);
@@ -1624,28 +1896,36 @@ function renderDashboardPage(snapshot) {
     return;
   }
 
+  ensureDashboardMiniCardsLayout();
+
   const unitMode = snapshot.settings.unit;
   const analytics = getVehicleAnalytics(snapshot, activeVehicle.id);
   const monthlySpend = sumAmounts(analytics.currentMonthRecords);
   const previousMonthlySpend = sumAmounts(analytics.previousMonthRecords);
   const monthlyDistance = getDistanceCoverage(analytics.currentMonthRecords);
   const monthlyAvgEfficiency = averageEfficiency(analytics.currentFuelSeries);
+  const costPerDistance = getCostPerDistance(monthlySpend, monthlyDistance, unitMode);
 
   setText("dashboardMonthlySpend", formatNumber(monthlySpend, 2));
   setText("dashboardMonthlyDelta", getMonthDeltaLabel(monthlySpend, previousMonthlySpend));
   setText("dashboardMonthlyMileage", formatDistanceValue(monthlyDistance, unitMode, 0));
   setText("dashboardMileageUnit", formatDistanceUnit(unitMode));
   setText("dashboardAvgEfficiency", formatCompactEfficiency(monthlyAvgEfficiency, unitMode));
+  setText("dashboardCostPerDistanceLabel", getCostPerDistanceLabel(unitMode));
+  setText("dashboardCostPerDistance", monthlyDistance > 0 ? formatNumber(costPerDistance, 2) : "--");
+  setText("dashboardCostPerDistanceUnit", getCostPerDistanceUnit(unitMode));
   setText("dashboardCurrentCarName", activeVehicle.name);
 }
 
-function buildEmptyHistoryMarkup() {
+function buildEmptyHistoryMarkup(kind = "") {
+  const label = kind ? getCategoryLabel(kind) : "记录";
+  const description = kind ? `还没有${label}记录，先去“记录”页补第一条。` : "先去“记录”页添加第一条数据，趋势和历史会自动生成。";
   return `
     <div class="group">
       <div class="bg-surface-container rounded-lg p-6">
-        <p class="font-headline text-white font-bold text-lg">还没有记录</p>
-        <p class="font-body text-sm text-on-surface-variant mt-2">先去“记录”页添加第一条数据，趋势和历史会自动生成。</p>
-        <a class="inline-block mt-5 px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed font-bold text-sm" href="./add.html">去记录</a>
+        <p class="font-headline text-white font-bold text-lg">还没有${escapeHtml(label)}</p>
+        <p class="font-body text-sm text-on-surface-variant mt-2">${escapeHtml(description)}</p>
+        <a class="inline-block mt-5 px-4 py-2 rounded-full bg-primary-fixed text-on-primary-fixed font-bold text-sm" href="${escapeHtml(buildAddUrl(kind))}">去记录</a>
       </div>
     </div>
   `;
@@ -1661,6 +1941,17 @@ function getHistoryCardMetrics(record, efficiencyByRecordId, unitMode) {
       middleValue: record.odometerKm > 0 ? `${formatDistanceValue(record.odometerKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
       rightLabel: "加油量",
       rightValue: `${formatNumber(payload.liters, 2)} L`,
+    };
+  }
+
+  if (record.kind === "wash") {
+    return {
+      leftLabel: "记录类型",
+      leftValue: getCategoryLabel(record.kind),
+      middleLabel: "当前里程",
+      middleValue: record.odometerKm > 0 ? `${formatDistanceValue(record.odometerKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
+      rightLabel: record.note ? "备注" : "洗车方式",
+      rightValue: record.note || getWashTypeMeta(record.payload?.washType).shortLabel,
     };
   }
 
@@ -1684,15 +1975,30 @@ function renderHistoryList(snapshot) {
   const unitMode = snapshot.settings.unit;
   const analytics = getVehicleAnalytics(snapshot, activeVehicle.id);
   const vehicleMap = getVehicleMap(snapshot);
+  const filterKind = getHistoryFilterKind();
+  const scopedRecords = filterKind ? analytics.allRecords.filter((record) => record.kind === filterKind) : analytics.allRecords;
+  const { kicker, hint, action } = ensureLogsHeaderElements();
 
-  setText("logsTotalSpend", formatNumber(sumAmounts(analytics.allRecords), 2));
+  setText("logsTotalSpend", formatNumber(sumAmounts(scopedRecords), 2));
 
-  if (!analytics.allRecords.length) {
-    list.innerHTML = buildEmptyHistoryMarkup();
+  if (kicker) {
+    kicker.textContent = filterKind ? `${getCategoryLabel(filterKind)}历史` : "累计支出";
+  }
+  if (hint) {
+    hint.textContent = filterKind ? `仅显示当前车辆的${getCategoryLabel(filterKind)}记录，轻触编辑，长按删除` : "轻触记录可编辑，长按可删除";
+  }
+  if (action) {
+    action.hidden = !filterKind;
+    action.href = buildLogsUrl();
+    action.textContent = "查看全部";
+  }
+
+  if (!scopedRecords.length) {
+    list.innerHTML = buildEmptyHistoryMarkup(filterKind);
     return;
   }
 
-  list.innerHTML = analytics.allRecords
+  list.innerHTML = scopedRecords
     .map((record) => {
       const vehicle = vehicleMap.get(record.vehicleId);
       const metrics = getHistoryCardMetrics(record, analytics.efficiencyByRecordId, unitMode);
@@ -1702,7 +2008,7 @@ function renderHistoryList(snapshot) {
             <h2 class="font-headline text-on-surface font-medium text-[1.25rem]">${escapeHtml(formatDateHeading(record.date))}</h2>
             <span class="font-label text-on-surface-variant text-[0.75rem] font-bold tracking-wider">${escapeHtml(formatTime(record.updatedAt || record.createdAt))}</span>
           </div>
-          <button class="app-card-button bg-surface-container rounded-lg p-6 transition-all duration-300 active:scale-[0.98] active:bg-surface-container-high cursor-pointer" data-record-id="${escapeHtml(record.id)}" type="button">
+          <button class="app-card-button app-history-card bg-surface-container rounded-lg p-6 transition-all duration-300 active:scale-[0.98] active:bg-surface-container-high cursor-pointer" data-record-id="${escapeHtml(record.id)}" type="button">
             <div class="flex justify-between items-start mb-6">
               <div>
                 <p class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-tighter mb-1">记录车辆</p>
@@ -1733,9 +2039,77 @@ function renderHistoryList(snapshot) {
     })
     .join("");
 
-  const recordMap = new Map(analytics.allRecords.map((record) => [record.id, record]));
+  const recordMap = new Map(scopedRecords.map((record) => [record.id, record]));
   list.querySelectorAll("[data-record-id]").forEach((button) => {
+    let holdTimer = 0;
+    let holdTriggered = false;
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+
+    const clearHold = () => {
+      if (holdTimer) {
+        window.clearTimeout(holdTimer);
+        holdTimer = 0;
+      }
+      button.classList.remove("app-history-card--holding");
+    };
+
+    button.addEventListener("pointerdown", (event) => {
+      if (event.button !== undefined && event.button !== 0) {
+        return;
+      }
+
+      holdTriggered = false;
+      pointerStartX = event.clientX ?? 0;
+      pointerStartY = event.clientY ?? 0;
+      button.classList.add("app-history-card--holding");
+      holdTimer = window.setTimeout(async () => {
+        holdTimer = 0;
+        holdTriggered = true;
+        button.classList.remove("app-history-card--holding");
+
+        const nextSnapshot = await loadSnapshot();
+        const record = nextSnapshot.records.find((item) => item.id === (button.dataset.recordId || ""));
+        if (!record) {
+          return;
+        }
+
+        const shouldDelete = window.confirm(`确认删除 ${formatDateHeading(record.date)} 的${getCategoryLabel(record.kind)}记录？`);
+        if (!shouldDelete) {
+          return;
+        }
+
+        nextSnapshot.records = nextSnapshot.records.filter((item) => item.id !== record.id);
+        await saveSnapshot(nextSnapshot);
+        renderHistoryList(await loadSnapshot());
+        showToast("记录已删除");
+      }, 560);
+    });
+
+    button.addEventListener("pointermove", (event) => {
+      if (!holdTimer) {
+        return;
+      }
+
+      if (Math.abs((event.clientX ?? 0) - pointerStartX) > 8 || Math.abs((event.clientY ?? 0) - pointerStartY) > 8) {
+        clearHold();
+      }
+    });
+
+    ["pointerup", "pointerleave", "pointercancel"].forEach((type) => {
+      button.addEventListener(type, clearHold);
+    });
+
+    button.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+    });
+
     button.addEventListener("click", () => {
+      if (holdTriggered) {
+        holdTriggered = false;
+        return;
+      }
+
       const record = recordMap.get(button.dataset.recordId || "");
       if (!record) {
         return;
@@ -1759,8 +2133,9 @@ function renderStatsPage(snapshot) {
   const previousMonthlySpend = sumAmounts(previousMonthRecords);
   const daysElapsed = Math.max(1, new Date().getDate());
   const dailyAverage = monthlySpend / daysElapsed;
-  const summaryByKind = summarizeByKind(currentMonthRecords);
-  const fuelShare = monthlySpend > 0 ? (summaryByKind.fuel.amount / monthlySpend) * 100 : 0;
+  const summaryByKind = summarizeByKind(analytics.allRecords);
+  const currentMonthSummaryByKind = summarizeByKind(currentMonthRecords);
+  const fuelShare = monthlySpend > 0 ? (currentMonthSummaryByKind.fuel.amount / monthlySpend) * 100 : 0;
   const otherShare = Math.max(0, 100 - fuelShare);
   const compare = getMonthCompareValue(monthlySpend, previousMonthlySpend);
   const computedStyles = window.getComputedStyle(document.documentElement);
@@ -1771,7 +2146,7 @@ function renderStatsPage(snapshot) {
   setText("statsMonthlySpend", formatNumber(monthlySpend, 2));
   setText("statsDailyAverage", formatNumber(dailyAverage, 2));
   setText("statsMonthCompare", compare.text);
-  setText("statsFuelShare", `${formatNumber(fuelShare, 0)}%`);
+  setText("statsFuelShare", `${formatNumber(monthlySpend > 0 ? (currentMonthSummaryByKind.fuel.amount / monthlySpend) * 100 : 0, 0)}%`);
 
   const monthCompareElement = document.getElementById("statsMonthCompare");
   if (monthCompareElement) {
@@ -1784,6 +2159,30 @@ function renderStatsPage(snapshot) {
     const suffix = kind.charAt(0).toUpperCase() + kind.slice(1);
     setText(`stats${suffix}Count`, getCategoryCountLabel(summary.count));
     setText(`stats${suffix}Amount`, formatNumber(summary.amount, 2));
+  });
+
+  document.getElementById("statsViewAllLink")?.setAttribute("href", buildLogsUrl());
+
+  CATEGORY_ORDER.forEach((kind) => {
+    const countElement = document.getElementById(`stats${kind.charAt(0).toUpperCase() + kind.slice(1)}Count`);
+    const row = countElement?.closest(".flex.items-center.gap-5");
+    if (!row) {
+      return;
+    }
+
+    row.classList.add("cursor-pointer", "rounded-2xl", "px-2", "py-0.5", "-mx-2", "transition-all", "duration-200");
+    row.tabIndex = 0;
+    row.setAttribute("role", "link");
+    row.setAttribute("aria-label", `查看${getCategoryLabel(kind)}历史`);
+    row.onclick = () => {
+      window.location.href = buildLogsUrl(kind);
+    };
+    row.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        window.location.href = buildLogsUrl(kind);
+      }
+    };
   });
 
   const baseArc = document.getElementById("statsBaseArc");
@@ -1807,12 +2206,23 @@ function renderStatsPage(snapshot) {
 }
 
 function renderSettingsPage(snapshot) {
+  ensureCurrentCarArtwork();
   const activeVehicle = getActiveVehicle(snapshot);
   const secondaryVehicle = getSecondaryVehicle(snapshot);
 
   if (activeVehicle) {
     setText("settingsCurrentCarName", activeVehicle.name);
     setText("settingsCurrentCarPlate", activeVehicle.plate || "未设置牌照");
+    const artworkElement = document.getElementById("settingsCurrentCarArtwork");
+    const moodElement = document.getElementById("settingsCurrentCarMood");
+    const artworkMeta = getVehicleArtworkMeta(activeVehicle.name);
+    if (artworkElement) {
+      artworkElement.src = artworkMeta.src;
+      artworkElement.alt = artworkMeta.alt;
+    }
+    if (moodElement) {
+      moodElement.textContent = artworkMeta.mood;
+    }
   }
 
   if (secondaryVehicle) {
@@ -1868,7 +2278,7 @@ function promptVehicleFields(initialVehicle = {}, options = {}) {
 
 async function initAddPage(snapshot) {
   const params = new URLSearchParams(window.location.search);
-  const requestedKind = isNonFuelKind(params.get("kind")) ? params.get("kind") : "fuel";
+  const requestedKind = isPrimaryRecordKind(params.get("kind")) ? params.get("kind") : "fuel";
   const editingId = params.get("id");
   const activeVehicle = getActiveVehicle(snapshot);
   const form = document.getElementById("recordForm");
@@ -1888,14 +2298,24 @@ async function initAddPage(snapshot) {
   const genericAmountInput = document.getElementById("recordGenericAmount");
   const titleInput = document.getElementById("recordTitle");
   const noteInput = document.getElementById("recordNote");
+  const odometerWrap = document.getElementById("recordOdometerWrap");
   const fuelPrimaryFields = document.getElementById("fuelPrimaryFields");
   const genericPrimaryFields = document.getElementById("genericPrimaryFields");
   const fuelConfigSection = document.getElementById("fuelConfigSection");
   const genericConfigSection = document.getElementById("genericConfigSection");
+  const washConfigSection = document.getElementById("washConfigSection");
+  const washOptionLabel = washConfigSection?.querySelector("label");
   const editingRecord = snapshot.records.find((record) => record.id === editingId) || null;
 
   let selectedKind = editingRecord?.kind || requestedKind;
   let selectedFuelType = editingRecord?.kind === "fuel" ? getFuelPayload(editingRecord).fuelType : "95#";
+  let selectedWashType = editingRecord?.kind === "wash" ? getWashTypeFromRecord(editingRecord) : "premium";
+
+  if (washOptionLabel) {
+    washOptionLabel.textContent = "洗车方式";
+  }
+  document.querySelector('[data-wash-type="premium"]')?.replaceChildren("精选");
+  document.querySelector('[data-wash-type="basic"]')?.replaceChildren("普洗");
 
   function syncPageCopy() {
     const isFuelMode = selectedKind === "fuel";
@@ -1948,6 +2368,7 @@ async function initAddPage(snapshot) {
 
   function syncModeVisibility() {
     const isFuelMode = selectedKind === "fuel";
+    const showOdometer = isOdometerRequiredKind(selectedKind);
     if (fuelPrimaryFields) {
       fuelPrimaryFields.hidden = !isFuelMode;
     }
@@ -1960,21 +2381,32 @@ async function initAddPage(snapshot) {
     if (genericConfigSection) {
       genericConfigSection.hidden = isFuelMode;
     }
+    if (odometerWrap) {
+      odometerWrap.hidden = !showOdometer;
+    }
+    if (!showOdometer && odometerInput && !editingRecord) {
+      odometerInput.value = "";
+    }
+    if (washConfigSection) {
+      washConfigSection.hidden = selectedKind !== "wash";
+    }
 
     setFuelButtons(selectedFuelType);
     setRecordKindButtons(selectedKind);
+    setWashButtons(selectedWashType);
     syncPageCopy();
   }
 
-  function seedGenericTitle(previousKind = selectedKind) {
+  function seedGenericTitle(force = false) {
     if (!titleInput || !isNonFuelKind(selectedKind)) {
       return;
     }
 
     const currentValue = titleInput.value.trim();
-    const previousMeta = getNonFuelFormMeta(previousKind);
-    if (!currentValue || currentValue === previousMeta.defaultTitle || currentValue === getCategoryLabel(previousKind)) {
-      titleInput.value = getNonFuelFormMeta(selectedKind).defaultTitle;
+    if (force || !currentValue || isDefaultGenericTitle(currentValue)) {
+      titleInput.value = getDefaultGenericTitle(selectedKind, {
+        washType: selectedWashType,
+      });
     }
   }
 
@@ -2011,18 +2443,31 @@ async function initAddPage(snapshot) {
 
   function buildGenericDraftRecord() {
     const createdAt = editingRecord?.createdAt || nowIso();
+    const preservedOdometer = editingRecord?.kind === selectedKind ? asNumber(editingRecord?.odometerKm) : 0;
     return normalizeRecord({
       id: editingRecord?.id,
       vehicleId: editingRecord?.vehicleId || activeVehicle?.id || "",
       kind: selectedKind,
       date: dateInput?.value || getToday(),
       amount: asNumber(genericAmountInput?.value),
-      odometerKm: asNumber(odometerInput?.value),
-      title: titleInput?.value?.trim() || getNonFuelFormMeta(selectedKind).defaultTitle,
+      odometerKm: isOdometerRequiredKind(selectedKind) ? asNumber(odometerInput?.value) : preservedOdometer,
+      title:
+        titleInput?.value?.trim() ||
+        getDefaultGenericTitle(selectedKind, {
+          washType: selectedWashType,
+        }),
       note: noteInput?.value?.trim() || "",
       createdAt,
       updatedAt: nowIso(),
-      payload: {},
+      payload:
+        selectedKind === "wash"
+          ? {
+              ...(editingRecord?.kind === "wash" ? editingRecord.payload || {} : {}),
+              washType: selectedWashType,
+            }
+          : editingRecord?.kind === selectedKind
+            ? { ...(editingRecord.payload || {}) }
+            : {},
     });
   }
 
@@ -2035,8 +2480,16 @@ async function initAddPage(snapshot) {
   }
 
   function validateGenericRecord(record, records) {
-    if (!record.date || record.odometerKm <= 0 || record.amount <= 0 || !record.title.trim()) {
+    if (!record.date || record.amount <= 0 || !record.title.trim()) {
+      return "请完整填写日期、金额和项目名称";
+    }
+
+    if (isOdometerRequiredKind(record.kind) && record.odometerKm <= 0) {
       return "请完整填写日期、里程、金额和项目名称";
+    }
+
+    if (!isOdometerRequiredKind(record.kind)) {
+      return "";
     }
 
     return validateOdometerSequence(records, record);
@@ -2070,8 +2523,11 @@ async function initAddPage(snapshot) {
     if (noteInput) {
       noteInput.value = editingRecord.note || "";
     }
+    if (editingRecord.kind === "wash") {
+      selectedWashType = getWashTypeFromRecord(editingRecord);
+    }
   } else if (isNonFuelKind(selectedKind)) {
-    seedGenericTitle(selectedKind);
+    seedGenericTitle(true);
   }
 
   document.querySelector("[data-fuel-options]")?.addEventListener("click", (event) => {
@@ -2083,21 +2539,31 @@ async function initAddPage(snapshot) {
     setFuelButtons(selectedFuelType);
   });
 
-  document.querySelector("[data-kind-options]")?.addEventListener("click", (event) => {
+  document.querySelector("[data-record-kind-tabs]")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-record-kind]");
     if (!button) {
       return;
     }
 
     const nextKind = button.dataset.recordKind;
-    if (!isNonFuelKind(nextKind)) {
+    if (!isPrimaryRecordKind(nextKind)) {
       return;
     }
 
-    const previousKind = selectedKind;
     selectedKind = nextKind;
-    seedGenericTitle(previousKind);
+    seedGenericTitle(selectedKind !== "fuel");
     syncModeVisibility();
+  });
+
+  document.querySelector("[data-wash-options]")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-wash-type]");
+    if (!button) {
+      return;
+    }
+
+    selectedWashType = normalizeWashType(button.dataset.washType);
+    setWashButtons(selectedWashType);
+    seedGenericTitle();
   });
 
   [totalCostInput, litersInput].forEach((input) => {
