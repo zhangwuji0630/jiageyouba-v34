@@ -22,9 +22,6 @@
 - 已补充 `supabase/setup.sql`，用于创建云端快照表与 RLS 策略
 - 已修复静态 HTML 可见中文的编码风险，并统一版本到 `V3.6.0`
 - 已完成 Supabase 邮箱确认、登录联调与云同步状态验证
-- 已将首屏样式、图标字体、看板插图、Supabase SDK 本地化，减少海外第三方依赖
-- 已改为本地生成 `tailwind.generated.css`，不再依赖运行时 Tailwind CDN
-- 已为云同步加入超时降级，本地模式在网络较差时可继续使用
 
 ## 数据模型
 
@@ -74,15 +71,6 @@
    - `Redirect URLs`：`https://zhangwuji0630.github.io/jiageyouba-v34/**`
 4. 打开 SQL Editor，执行 `supabase/setup.sql`
 
-如果后续切换到自定义域名或 CDN 前置域名：
-
-1. 保留当前 `github.io` 地址作为备用回调
-2. 在 `Authentication > URL Configuration` 里新增新的生产域名
-3. 保证新的域名也包含：
-   - `/`
-   - `/**`
-   - `/settings.html`
-
 ## 版本规则
 
 - `x.y.z`：小修复、布局调整、文案修正、缓存更新，不改数据结构
@@ -95,43 +83,6 @@
 - `manifest.webmanifest`
 - `README.md`
 - `service-worker.js` 缓存键
-
-## 开发与发布
-
-首次或更新依赖后执行：
-
-1. `npm install`
-2. `npm run build:css`
-
-当前静态站点的关键资源已经本地化，仓库内需要一并提交：
-
-- `tailwind.generated.css`
-- `vendor/material-symbols.css`
-- `icons/fonts/material-symbols-outlined.ttf`
-- `vendor/supabase-js.min.js`
-- `images/dashboard-story.png`
-
-`0331` 分支已经作为稳定开发分支使用。
-
-- 推送到 `0331` 后，仓库中的 `.github/workflows/deploy-pages-0331.yml` 会用于 GitHub Pages 部署
-- 如果 GitHub Pages 后续切换到 `GitHub Actions` 作为发布来源，这个工作流可以直接复用
-
-## 中国用户访问优化
-
-当前版本已经完成的优化：
-
-- 去掉 `cdn.tailwindcss.com`
-- 去掉 Google Fonts 与 Google Material Symbols 远程依赖
-- 去掉首页 Google 图片源
-- 去掉所有页面的首屏远程 Supabase SDK 脚本依赖
-- 云同步失败时快速回退到本地模式，而不是卡住主流程
-- `service-worker` 预缓存改为更稳健的安装方式，降低单资源失败导致整体失效的概率
-
-建议继续推进的部署层优化：
-
-1. 给站点增加自定义域名，并在前面接 Cloudflare 做 DNS 与缓存控制。
-2. 在 Supabase 中同步配置新的站点域名与回调地址。
-3. 如果后续需要更强的中国区访问稳定性，可考虑将静态前端镜像到 Cloudflare Pages，同时保留 GitHub 作为源码仓库。
 
 ## 本次版本
 
