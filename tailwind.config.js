@@ -7,10 +7,6 @@ module.exports = {
     "./settings.html",
     "./app.js",
   ],
-  plugins: [
-    require("@tailwindcss/forms"),
-    require("@tailwindcss/container-queries"),
-  ],
   theme: {
     extend: {
       colors: {
