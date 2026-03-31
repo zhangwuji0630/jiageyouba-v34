@@ -7,14 +7,82 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <meta content="记录加油、保养和车辆花费，支持离线访问与云同步。" name="description"/>
   <title>设置 - 加油记录 V3.6.0</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
-  <link href="./tailwind.generated.css" rel="stylesheet"/>
   <link href="./app.css" rel="stylesheet"/>
-  <link href="./vendor/material-symbols.css" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&amp;family=Inter:wght@100;300;400;700&amp;display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+  <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-variant": "#262626",
+              "error": "#ff7351",
+              "on-secondary-container": "#f0dcff",
+              "error-container": "#b92902",
+              "outline": "#767575",
+              "error-dim": "#d53d18",
+              "primary-dim": "#beee00",
+              "on-secondary-fixed-variant": "#7500cc",
+              "surface-container-high": "#20201f",
+              "primary-fixed": "#cafd00",
+              "on-tertiary-container": "#5d5000",
+              "secondary": "#bf81ff",
+              "surface-container-low": "#131313",
+              "surface-container": "#1a1a1a",
+              "inverse-on-surface": "#565555",
+              "on-secondary": "#32005c",
+              "secondary-fixed": "#e4c6ff",
+              "on-primary-fixed": "#3a4a00",
+              "on-error-container": "#ffd2c8",
+              "secondary-fixed-dim": "#dab4ff",
+              "on-error": "#450900",
+              "on-primary-container": "#4a5e00",
+              "surface-tint": "#f3ffca",
+              "inverse-surface": "#fcf9f8",
+              "on-surface-variant": "#adaaaa",
+              "on-primary-fixed-variant": "#526900",
+              "primary-container": "#cafd00",
+              "surface-dim": "#0e0e0e",
+              "on-secondary-fixed": "#4e008a",
+              "on-background": "#ffffff",
+              "tertiary-dim": "#edd13a",
+              "surface-bright": "#2c2c2c",
+              "primary": "#f3ffca",
+              "tertiary-fixed-dim": "#edd13a",
+              "on-tertiary-fixed": "#483d00",
+              "surface": "#0e0e0e",
+              "inverse-primary": "#516700",
+              "on-tertiary": "#665800",
+              "tertiary-fixed": "#fce047",
+              "secondary-container": "#7701d0",
+              "on-tertiary-fixed-variant": "#685900",
+              "background": "#0e0e0e",
+              "tertiary-container": "#fce047",
+              "tertiary": "#ffeea5",
+              "surface-container-lowest": "#000000",
+              "secondary-dim": "#9c42f4",
+              "surface-container-highest": "#262626",
+              "on-surface": "#ffffff",
+              "on-primary": "#516700",
+              "primary-fixed-dim": "#beee00",
+              "outline-variant": "#484847"
+            },
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "1rem", "lg": "2rem", "xl": "3rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
   <style>
       .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
@@ -33,7 +101,7 @@
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-3">
         <span class="material-symbols-outlined text-[#cafd00]" data-icon="settings">settings</span>
-        <h1 class="font-headline font-bold text-white text-xl">设置</h1>
+        <h1 class="font-['Manrope'] font-bold text-white text-xl">设置</h1>
       </div>
       <button class="hover:opacity-80 transition-opacity active:scale-95 duration-200" id="darkModeToggle" type="button">
         <span class="material-symbols-outlined text-[#adaaaa]" data-icon="dark_mode">dark_mode</span>
@@ -145,7 +213,6 @@
           <div class="flex-1 min-w-0">
             <p class="text-on-surface font-headline font-medium" id="cloudAuthStatus">未登录云同步</p>
             <p class="text-on-surface-variant text-xs font-thin mt-1" id="cloudAuthHint">登录后可在重装 PWA 后恢复车辆与记录</p>
-            <p class="text-on-surface-variant text-[11px] font-thin mt-2" id="cloudModeStatus">当前模式：本地优先</p>
             <p class="text-on-surface-variant text-[11px] font-thin mt-2" id="cloudLastSyncStatus">最近云同步：未开始</p>
           </div>
         </div>
@@ -203,26 +270,27 @@
     <div class="flex justify-around items-center h-20 px-4 pb-safe w-full">
       <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./index.html">
         <span class="material-symbols-outlined" data-icon="speed">speed</span>
-        <span class="font-headline text-[10px] font-bold uppercase tracking-wider mt-1">看板</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">看板</span>
       </a>
       <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./add.html">
         <span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
-        <span class="font-headline text-[10px] font-bold uppercase tracking-wider mt-1">记录</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">记录</span>
       </a>
       <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./stats.html">
         <span class="material-symbols-outlined" data-icon="insights">insights</span>
-        <span class="font-headline text-[10px] font-bold uppercase tracking-wider mt-1">趋势</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">趋势</span>
       </a>
       <a class="app-nav-link flex flex-col items-center justify-center text-[#adaaaa] hover:text-white transition-colors active:scale-90 duration-300 ease-out" href="./logs.html">
         <span class="material-symbols-outlined" data-icon="history">history</span>
-        <span class="font-headline text-[10px] font-bold uppercase tracking-wider mt-1">历史</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">历史</span>
       </a>
       <a class="app-nav-link app-nav-link--active flex flex-col items-center justify-center text-[#cafd00] transition-colors active:scale-90 duration-300 ease-out" href="./settings.html">
         <span class="material-symbols-outlined" data-icon="settings" style="font-variation-settings: 'FILL' 1;">settings</span>
-        <span class="font-headline text-[10px] font-bold uppercase tracking-wider mt-1">设置</span>
+        <span class="font-['Manrope'] text-[10px] font-bold uppercase tracking-wider mt-1">设置</span>
       </a>
     </div>
   </nav>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="./app.js"></script>
 </body>
 </html>
