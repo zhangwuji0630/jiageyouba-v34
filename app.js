@@ -193,6 +193,17 @@ const FOOTER_QUOTES = Object.freeze({
   ],
 });
 
+const DASHBOARD_STORY_QUOTES = Object.freeze([
+  "把路走长一点，把心放远一点。",
+  "把今天开稳，明天就会更顺。",
+  "先把方向扶正，再把路慢慢开远。",
+  "每一段认真走过的路，都会留下答案。",
+  "生活不必总是很快，但要一直向前。",
+  "把节奏握在手里，路就不会乱。",
+  "不是每次出发都很盛大，但都算数。",
+  "今天也给自己留一点继续出发的底气。",
+]);
+
 const FLASH_MESSAGES = Object.freeze({
   saved: "记录已保存",
   updated: "记录已更新",
@@ -1604,6 +1615,55 @@ function renderFooterQuote(page) {
   window.sessionStorage.setItem(sessionKey, nextQuote);
 }
 
+function renderDashboardStoryQuote() {
+  const card = document.getElementById("dashboardStoryCard");
+  const quoteElement = document.getElementById("dashboardStoryQuote");
+
+  if (!card || !quoteElement || !DASHBOARD_STORY_QUOTES.length) {
+    return;
+  }
+
+  const sessionKey = `${THEME_STORAGE_KEY}:quote:dashboard-story`;
+  const applyQuote = (quote) => {
+    quoteElement.classList.add("is-rotating");
+    window.setTimeout(() => {
+      quoteElement.textContent = quote;
+      quoteElement.classList.remove("is-rotating");
+    }, 120);
+    window.sessionStorage.setItem(sessionKey, quote);
+  };
+
+  const pickNextQuote = () => {
+    const previous = window.sessionStorage.getItem(sessionKey);
+    let nextQuote = DASHBOARD_STORY_QUOTES[Math.floor(Math.random() * DASHBOARD_STORY_QUOTES.length)];
+
+    if (DASHBOARD_STORY_QUOTES.length > 1 && nextQuote === previous) {
+      nextQuote = DASHBOARD_STORY_QUOTES[(DASHBOARD_STORY_QUOTES.indexOf(nextQuote) + 1) % DASHBOARD_STORY_QUOTES.length];
+    }
+
+    return nextQuote;
+  };
+
+  applyQuote(pickNextQuote());
+
+  if (card.dataset.quoteBound === "true") {
+    return;
+  }
+
+  const rotateQuote = () => {
+    applyQuote(pickNextQuote());
+  };
+
+  card.addEventListener("click", rotateQuote);
+  card.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      rotateQuote();
+    }
+  });
+  card.dataset.quoteBound = "true";
+}
+
 function showToast(message, tone = "default") {
   if (!message) {
     return;
@@ -2994,6 +3054,7 @@ async function initPage() {
   switch (document.body.dataset.page) {
     case "dashboard":
       renderDashboardPage(snapshot);
+      renderDashboardStoryQuote();
       break;
     case "add":
       await initAddPage(snapshot);
