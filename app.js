@@ -1753,11 +1753,14 @@ function playEntranceMotion(elements = [], options = {}) {
       return;
     }
 
-    element.style.setProperty("--motion-delay", `${baseDelay + index * stepDelay}ms`);
+    if (element._motionTimer) {
+      window.clearTimeout(element._motionTimer);
+    }
     element.classList.remove("is-visible");
-    window.requestAnimationFrame(() => {
+    element._motionTimer = window.setTimeout(() => {
       element.classList.add("is-visible");
-    });
+      element._motionTimer = 0;
+    }, baseDelay + index * stepDelay);
   });
 }
 
@@ -1840,11 +1843,14 @@ function playStatsCategoryEntrance(rows = []) {
       return;
     }
 
-    row.style.setProperty("--motion-delay", `${120 + index * 56}ms`);
+    if (row._motionTimer) {
+      window.clearTimeout(row._motionTimer);
+    }
     row.classList.remove("is-visible");
-    window.requestAnimationFrame(() => {
+    row._motionTimer = window.setTimeout(() => {
       row.classList.add("is-visible");
-    });
+      row._motionTimer = 0;
+    }, 120 + index * 56);
   });
 }
 
