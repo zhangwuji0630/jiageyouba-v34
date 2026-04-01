@@ -128,6 +128,10 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.app-dashboard-story-card:active {
+  transform: scale(0.988);
+}
+
 .app-dashboard-story-card:focus-visible {
   outline: 2px solid var(--app-focus);
   outline-offset: 2px;
@@ -141,6 +145,53 @@ body {
 .app-dashboard-story-quote.is-rotating {
   opacity: 0;
   transform: translateY(6px);
+}
+
+.app-motion-enter {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 460ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--motion-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.app-motion-enter.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-stats-category-row {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 180ms ease;
+  transition-delay: var(--motion-delay, 0ms);
+}
+
+.app-stats-category-row.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-dashboard-story-quote,
+  .app-motion-enter,
+  .app-stats-category-row,
+  .app-dashboard-story-card,
+  .app-toast {
+    transition: none !important;
+    transform: none !important;
+  }
+
+  .app-motion-enter,
+  .app-stats-category-row {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .app-inline-quote {

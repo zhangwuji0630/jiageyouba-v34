@@ -1664,6 +1664,190 @@ function renderDashboardStoryQuote() {
   card.dataset.quoteBound = "true";
 }
 
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches || false;
+}
+
+function easeOutCubic(value) {
+  return 1 - Math.pow(1 - value, 3);
+}
+
+function animateNumberText(id, targetValue, options = {}) {
+  const element = document.getElementById(id);
+  if (!element) {
+    return;
+  }
+
+  const {
+    digits = 0,
+    duration = 520,
+    prefix = "",
+    suffix = "",
+    formatter = null,
+  } = options;
+
+  if (!Number.isFinite(targetValue)) {
+    element.textContent = formatter ? formatter(targetValue) : `${prefix}${formatNumber(targetValue, digits)}${suffix}`;
+    return;
+  }
+
+  const finalValue = roundNumber(targetValue, digits);
+  if (prefersReducedMotion() || duration <= 0) {
+    element.textContent = formatter ? formatter(finalValue) : `${prefix}${formatNumber(finalValue, digits)}${suffix}`;
+    element.dataset.motionValue = String(finalValue);
+    return;
+  }
+
+  const startValue = Number(element.dataset.motionValue ?? 0);
+  if (Math.abs(finalValue - startValue) < Math.pow(10, -digits) / 2) {
+    element.textContent = formatter ? formatter(finalValue) : `${prefix}${formatNumber(finalValue, digits)}${suffix}`;
+    element.dataset.motionValue = String(finalValue);
+    return;
+  }
+
+  if (element._motionFrame) {
+    window.cancelAnimationFrame(element._motionFrame);
+  }
+
+  element.textContent = formatter ? formatter(startValue) : `${prefix}${formatNumber(startValue, digits)}${suffix}`;
+
+  const startedAt = performance.now();
+  const paint = (now) => {
+    const progress = Math.min((now - startedAt) / duration, 1);
+    const currentValue = startValue + (finalValue - startValue) * easeOutCubic(progress);
+    const roundedValue = progress >= 1 ? finalValue : roundNumber(currentValue, digits);
+    element.textContent = formatter ? formatter(roundedValue) : `${prefix}${formatNumber(roundedValue, digits)}${suffix}`;
+
+    if (progress < 1) {
+      element._motionFrame = window.requestAnimationFrame(paint);
+      return;
+    }
+
+    element.dataset.motionValue = String(finalValue);
+    element._motionFrame = 0;
+  };
+
+  element._motionFrame = window.requestAnimationFrame(paint);
+}
+
+function animatePercentageText(id, targetValue, options = {}) {
+  animateNumberText(id, targetValue, {
+    digits: options.digits ?? 0,
+    duration: options.duration ?? 620,
+    formatter: (value) => `${formatNumber(value, options.digits ?? 0)}%`,
+  });
+}
+
+function playEntranceMotion(elements = [], options = {}) {
+  const baseDelay = options.baseDelay ?? 0;
+  const stepDelay = options.stepDelay ?? 72;
+
+  elements.forEach((element, index) => {
+    if (!element) {
+      return;
+    }
+
+    element.classList.add("app-motion-enter");
+    if (prefersReducedMotion()) {
+      element.classList.add("is-visible");
+      return;
+    }
+
+    element.style.setProperty("--motion-delay", `${baseDelay + index * stepDelay}ms`);
+    element.classList.remove("is-visible");
+    window.requestAnimationFrame(() => {
+      element.classList.add("is-visible");
+    });
+  });
+}
+
+function playDashboardEntranceMotion() {
+  const hero = document.querySelector('.app-shell[data-page="dashboard"] .app-page-hero');
+  const spendCard = document.getElementById("dashboardMonthlySpend")?.closest(".bg-surface-container");
+  const miniCards = Array.from(document.querySelectorAll("#dashboardMiniCardsRow > .bg-surface-container"));
+  const storyCard = document.getElementById("dashboardStoryCard");
+  playEntranceMotion([hero, spendCard, ...miniCards, storyCard], {
+    baseDelay: 20,
+    stepDelay: 72,
+  });
+}
+
+function animateStatsDonut(fuelShare, otherShare) {
+  const fuelArc = document.getElementById("statsFuelArc");
+  const otherArc = document.getElementById("statsOtherArc");
+  if (!fuelArc || !otherArc) {
+    return;
+  }
+
+  const fuelTarget = (DONUT_CIRCUMFERENCE * fuelShare) / 100;
+  const otherTarget = (DONUT_CIRCUMFERENCE * otherShare) / 100;
+
+  if (prefersReducedMotion()) {
+    fuelArc.setAttribute("stroke-dasharray", `${fuelTarget} ${DONUT_CIRCUMFERENCE}`);
+    fuelArc.setAttribute("stroke-dashoffset", "0");
+    otherArc.setAttribute("stroke-dasharray", `${otherTarget} ${DONUT_CIRCUMFERENCE}`);
+    otherArc.setAttribute("stroke-dashoffset", `${-fuelTarget}`);
+    animatePercentageText("statsFuelShare", fuelShare, { duration: 0 });
+    return;
+  }
+
+  if (fuelArc._motionFrame) {
+    window.cancelAnimationFrame(fuelArc._motionFrame);
+  }
+
+  const duration = 620;
+  const secondaryDelay = 0.12;
+  fuelArc.setAttribute("stroke-dasharray", `0 ${DONUT_CIRCUMFERENCE}`);
+  fuelArc.setAttribute("stroke-dashoffset", "0");
+  otherArc.setAttribute("stroke-dasharray", `0 ${DONUT_CIRCUMFERENCE}`);
+  otherArc.setAttribute("stroke-dashoffset", "0");
+
+  const startedAt = performance.now();
+  const paint = (now) => {
+    const progress = Math.min((now - startedAt) / duration, 1);
+    const easedFuel = easeOutCubic(progress);
+    const easedOther = easeOutCubic(Math.max(0, (progress - secondaryDelay) / (1 - secondaryDelay)));
+    const fuelLength = fuelTarget * easedFuel;
+    const otherLength = otherTarget * easedOther;
+
+    fuelArc.setAttribute("stroke-dasharray", `${fuelLength} ${DONUT_CIRCUMFERENCE}`);
+    fuelArc.setAttribute("stroke-dashoffset", "0");
+    otherArc.setAttribute("stroke-dasharray", `${otherLength} ${DONUT_CIRCUMFERENCE}`);
+    otherArc.setAttribute("stroke-dashoffset", `${-fuelLength}`);
+    animatePercentageText("statsFuelShare", fuelShare * easedFuel, { duration: 0 });
+
+    if (progress < 1) {
+      fuelArc._motionFrame = window.requestAnimationFrame(paint);
+      return;
+    }
+
+    animatePercentageText("statsFuelShare", fuelShare, { duration: 0 });
+    fuelArc._motionFrame = 0;
+  };
+
+  fuelArc._motionFrame = window.requestAnimationFrame(paint);
+}
+
+function playStatsCategoryEntrance(rows = []) {
+  rows.forEach((row, index) => {
+    if (!row) {
+      return;
+    }
+
+    row.classList.add("app-stats-category-row");
+    if (prefersReducedMotion()) {
+      row.classList.add("is-visible");
+      return;
+    }
+
+    row.style.setProperty("--motion-delay", `${120 + index * 56}ms`);
+    row.classList.remove("is-visible");
+    window.requestAnimationFrame(() => {
+      row.classList.add("is-visible");
+    });
+  });
+}
+
 function showToast(message, tone = "default") {
   if (!message) {
     return;
@@ -1965,16 +2149,36 @@ function renderDashboardPage(snapshot) {
   const monthlyDistance = getDistanceCoverage(analytics.currentMonthRecords);
   const monthlyAvgEfficiency = averageEfficiency(analytics.currentFuelSeries);
   const costPerDistance = getCostPerDistance(monthlySpend, monthlyDistance, unitMode);
+  const displayedMileage = unitMode === "imperial" ? monthlyDistance * MILES_PER_KM : monthlyDistance;
+  const displayedEfficiency = monthlyAvgEfficiency > 0
+    ? (unitMode === "imperial" ? 235.214583 / monthlyAvgEfficiency : monthlyAvgEfficiency)
+    : 0;
 
-  setText("dashboardMonthlySpend", formatNumber(monthlySpend, 2));
+  animateNumberText("dashboardMonthlySpend", monthlySpend, { digits: 2, duration: 620 });
   setText("dashboardMonthlyDelta", getMonthDeltaLabel(monthlySpend, previousMonthlySpend));
-  setText("dashboardMonthlyMileage", formatDistanceValue(monthlyDistance, unitMode, 0));
+  animateNumberText("dashboardMonthlyMileage", displayedMileage, { digits: 0, duration: 560 });
   setText("dashboardMileageUnit", formatDistanceUnit(unitMode));
-  setText("dashboardAvgEfficiency", formatCompactEfficiency(monthlyAvgEfficiency, unitMode));
+  if (monthlyAvgEfficiency > 0) {
+    animateNumberText("dashboardAvgEfficiency", displayedEfficiency, {
+      digits: 1,
+      duration: 580,
+      formatter: (value) =>
+        unitMode === "imperial"
+          ? `${formatNumber(value, 1)} MPG`
+          : `${formatNumber(value, 1)} L/100`,
+    });
+  } else {
+    setText("dashboardAvgEfficiency", formatCompactEfficiency(monthlyAvgEfficiency, unitMode));
+  }
   setText("dashboardCostPerDistanceLabel", getCostPerDistanceLabel(unitMode));
-  setText("dashboardCostPerDistance", monthlyDistance > 0 ? formatNumber(costPerDistance, 2) : "--");
+  if (monthlyDistance > 0) {
+    animateNumberText("dashboardCostPerDistance", costPerDistance, { digits: 2, duration: 600 });
+  } else {
+    setText("dashboardCostPerDistance", "--");
+  }
   setText("dashboardCostPerDistanceUnit", getCostPerDistanceUnit(unitMode));
   setText("dashboardCurrentCarName", activeVehicle.name);
+  playDashboardEntranceMotion();
 }
 
 function buildEmptyHistoryMarkup(kind = "") {
@@ -2206,7 +2410,7 @@ function renderStatsPage(snapshot) {
   setText("statsMonthlySpend", formatNumber(monthlySpend, 2));
   setText("statsDailyAverage", formatNumber(dailyAverage, 2));
   setText("statsMonthCompare", compare.text);
-  setText("statsFuelShare", `${formatNumber(monthlySpend > 0 ? (currentMonthSummaryByKind.fuel.amount / monthlySpend) * 100 : 0, 0)}%`);
+  setText("statsFuelShare", "0%");
 
   const monthCompareElement = document.getElementById("statsMonthCompare");
   if (monthCompareElement) {
@@ -2245,6 +2449,12 @@ function renderStatsPage(snapshot) {
     };
   });
 
+  const statsCategoryRows = CATEGORY_ORDER.map((kind) => {
+    const countElement = document.getElementById(`stats${kind.charAt(0).toUpperCase() + kind.slice(1)}Count`);
+    return countElement?.closest(".flex.items-center.gap-5") || null;
+  }).filter(Boolean);
+  playStatsCategoryEntrance(statsCategoryRows);
+
   const baseArc = document.getElementById("statsBaseArc");
   if (baseArc) {
     baseArc.setAttribute("stroke", baseStroke);
@@ -2253,16 +2463,14 @@ function renderStatsPage(snapshot) {
   const fuelArc = document.getElementById("statsFuelArc");
   if (fuelArc) {
     fuelArc.setAttribute("stroke", accentStroke);
-    fuelArc.setAttribute("stroke-dasharray", `${(DONUT_CIRCUMFERENCE * fuelShare) / 100} ${DONUT_CIRCUMFERENCE}`);
-    fuelArc.setAttribute("stroke-dashoffset", "0");
   }
 
   const otherArc = document.getElementById("statsOtherArc");
   if (otherArc) {
     otherArc.setAttribute("stroke", secondaryStroke);
-    otherArc.setAttribute("stroke-dasharray", `${(DONUT_CIRCUMFERENCE * otherShare) / 100} ${DONUT_CIRCUMFERENCE}`);
-    otherArc.setAttribute("stroke-dashoffset", `${-(DONUT_CIRCUMFERENCE * fuelShare) / 100}`);
   }
+
+  animateStatsDonut(fuelShare, otherShare);
 }
 
 function renderSettingsPage(snapshot) {
