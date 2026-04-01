@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>历史 - 加油记录 V3.6.3</title>
+  <title>历史 - 加油记录 V3.6.4</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -97,7 +97,7 @@
     }
   </style>
 </head>
-<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="logs">
+<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="logs" data-page-hydrated="false">
   <header class="app-topbar fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e] flat no-shadows">
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-3">
@@ -113,44 +113,11 @@
     <section class="app-page-hero mb-12">
       <p class="text-on-surface-variant font-label text-[0.75rem] font-bold tracking-widest uppercase mb-2">累计支出</p>
       <div class="flex items-baseline gap-2">
-        <span class="text-on-surface font-headline text-[3.5rem] font-bold leading-none" id="logsTotalSpend">12840.50</span>
+        <span class="text-on-surface font-headline text-[3.5rem] font-bold leading-none" data-page-hydration-gate id="logsTotalSpend">0.00</span>
         <span class="text-primary-fixed font-headline text-lg font-bold">CNY</span>
       </div>
     </section>
-    <div class="space-y-8" id="historyList">
-      <div class="group">
-        <div class="flex justify-between items-end mb-4">
-          <h2 class="font-headline text-on-surface font-medium text-[1.25rem]">2024年03月20日</h2>
-          <span class="font-label text-on-surface-variant text-[0.75rem] font-bold tracking-wider">09:45</span>
-        </div>
-        <div class="bg-surface-container rounded-lg p-6 transition-all duration-300 active:scale-[0.98] active:bg-surface-container-high cursor-pointer">
-          <div class="flex justify-between items-start mb-6">
-            <div>
-              <p class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-tighter mb-1">加油车辆</p>
-              <p class="font-headline text-white font-bold text-lg">粤B*****45</p>
-            </div>
-            <div class="text-right">
-              <p class="font-label text-on-surface-variant text-[0.7rem] uppercase tracking-tighter mb-1">实付金额</p>
-              <p class="font-headline text-primary-fixed font-bold text-xl">450.00</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-3 gap-4 pt-4 border-t border-outline-variant/10">
-            <div>
-              <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">油耗</p>
-              <p class="font-headline text-white text-[0.9rem] font-medium">8.5 L/100KM</p>
-            </div>
-            <div>
-              <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">当前里程</p>
-              <p class="font-headline text-white text-[0.9rem] font-medium">45200</p>
-            </div>
-            <div class="text-right">
-              <p class="font-label text-on-surface-variant text-[0.65rem] uppercase mb-1">加油量</p>
-              <p class="font-headline text-white text-[0.9rem] font-medium">52.94 L</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <div class="space-y-8" data-page-hydration-gate id="historyList"></div>
     <div class="page-footer-quote page-footer-quote--logs mt-20 mb-8 text-center px-12">
       <div class="inline-block p-1 bg-gradient-to-r from-transparent via-primary-fixed/20 to-transparent w-full h-px mb-6"></div>
       <p class="font-body font-light text-on-surface-variant italic tracking-widest text-[0.9rem]" id="logsFooterQuote">下一站，山海相见</p>

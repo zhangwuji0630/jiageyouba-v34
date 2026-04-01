@@ -26,7 +26,7 @@ const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const PAGE_VISIT_STORAGE_KEY = `${THEME_STORAGE_KEY}:page-visit`;
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
-const APP_VERSION = "3.6.3";
+const APP_VERSION = "3.6.4";
 const DASHBOARD_FAST_RETURN_WINDOW_MS = 4500;
 const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
@@ -1851,6 +1851,12 @@ function setDashboardHydrated(isHydrated) {
   }
 }
 
+function setPageHydrated(isHydrated) {
+  if (document.body?.hasAttribute("data-page-hydrated")) {
+    document.body.dataset.pageHydrated = isHydrated ? "true" : "false";
+  }
+}
+
 function animateStatsDonut(fuelShare, otherShare) {
   const fuelArc = document.getElementById("statsFuelArc");
   const otherArc = document.getElementById("statsOtherArc");
@@ -2320,6 +2326,7 @@ function renderHistoryList(snapshot) {
   const list = document.getElementById("historyList");
   const activeVehicle = getActiveVehicle(snapshot);
   if (!list || !activeVehicle) {
+    setPageHydrated(true);
     return;
   }
 
@@ -2346,6 +2353,7 @@ function renderHistoryList(snapshot) {
 
   if (!scopedRecords.length) {
     list.innerHTML = buildEmptyHistoryMarkup(filterKind);
+    setPageHydrated(true);
     return;
   }
 
@@ -2469,11 +2477,14 @@ function renderHistoryList(snapshot) {
       window.location.href = `./add.html?id=${encodeURIComponent(record.id)}`;
     });
   });
+
+  setPageHydrated(true);
 }
 
 function renderStatsPage(snapshot) {
   const activeVehicle = getActiveVehicle(snapshot);
   if (!activeVehicle) {
+    setPageHydrated(true);
     return;
   }
 
@@ -2540,6 +2551,7 @@ function renderStatsPage(snapshot) {
     const countElement = document.getElementById(`stats${kind.charAt(0).toUpperCase() + kind.slice(1)}Count`);
     return countElement?.closest(".flex.items-center.gap-5") || null;
   }).filter(Boolean);
+  setPageHydrated(true);
   playStatsCategoryEntrance(statsCategoryRows);
 
   const baseArc = document.getElementById("statsBaseArc");
@@ -2599,7 +2611,13 @@ function renderSettingsPage(snapshot) {
     latestRecord ? `最后同步：${formatDateHeading(latestRecord.date)} ${formatTime(latestRecord.updatedAt || latestRecord.createdAt)}` : "最后同步：暂无数据"
   );
 
-  void renderCloudAuthState(snapshot);
+  void renderCloudAuthState(snapshot)
+    .catch((error) => {
+      console.error(error);
+    })
+    .finally(() => {
+      setPageHydrated(true);
+    });
 }
 
 function promptVehicleFields(initialVehicle = {}, options = {}) {

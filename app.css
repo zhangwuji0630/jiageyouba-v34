@@ -172,6 +172,10 @@ html.dashboard-fast-return body[data-page="dashboard"][data-dashboard-hydrated="
   visibility: hidden;
 }
 
+body[data-page-hydrated="false"] [data-page-hydration-gate] {
+  visibility: hidden;
+}
+
 .app-stats-category-row {
   opacity: 0;
   transform: translateY(14px);

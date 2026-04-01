@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>设置 - 加油记录 V3.6.3</title>
+  <title>设置 - 加油记录 V3.6.4</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -96,7 +96,7 @@
       }
     </style>
 </head>
-<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed overflow-x-hidden" data-page="settings">
+<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed overflow-x-hidden" data-page="settings" data-page-hydrated="false">
   <header class="app-topbar fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e]">
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-3">
@@ -112,10 +112,10 @@
     <section>
       <div class="flex justify-between items-end mb-6">
         <h2 class="font-headline font-medium text-[1.75rem] text-on-surface">我的车库</h2>
-        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.6.3</span>
+        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.6.4</span>
       </div>
       <div class="grid grid-cols-2 gap-4">
-        <div class="col-span-2 app-quote-card rounded-lg p-6 relative overflow-hidden group cursor-pointer border border-white/5" id="currentCarCard">
+        <div class="col-span-2 app-quote-card rounded-lg p-6 relative overflow-hidden group cursor-pointer border border-white/5" data-page-hydration-gate id="currentCarCard">
           <div class="absolute inset-0 bg-[linear-gradient(90deg,rgba(6,18,26,0.92)_0%,rgba(6,18,26,0.86)_34%,rgba(16,112,132,0.18)_100%)]"></div>
           <div class="absolute inset-y-0 right-0 w-[46%]">
             <div class="absolute inset-0 bg-gradient-to-r from-surface-container via-surface-container/20 to-transparent"></div>
@@ -123,21 +123,21 @@
           </div>
           <div class="relative z-10 max-w-[58%]">
             <p class="font-label text-[10px] text-on-surface-variant uppercase mb-1 tracking-widest">当前驾驶</p>
-            <h3 class="font-headline text-lg font-bold" id="settingsCurrentCarName">保时捷 911 GT3</h3>
-            <p class="font-body text-sm font-thin text-on-surface-variant mt-1" id="settingsCurrentCarPlate">沪A · 911GT3</p>
+            <h3 class="font-headline text-lg font-bold" id="settingsCurrentCarName">当前车辆</h3>
+            <p class="font-body text-sm font-thin text-on-surface-variant mt-1" id="settingsCurrentCarPlate">牌照待加载</p>
             <div class="mt-8 flex items-center gap-2 flex-wrap">
               <span class="px-3 py-1 bg-primary-fixed/10 text-primary-fixed rounded-full text-[10px] font-bold">主用车</span>
             </div>
           </div>
         </div>
-        <div class="bg-surface-container-high rounded-lg p-5 aspect-square flex flex-col justify-between cursor-pointer" id="backupCarCard">
+        <div class="bg-surface-container-high rounded-lg p-5 aspect-square flex flex-col justify-between cursor-pointer" data-page-hydration-gate id="backupCarCard">
           <div>
             <p class="font-label text-[10px] text-on-surface-variant uppercase mb-1 tracking-widest">备用</p>
-            <h3 class="font-headline text-sm font-bold" id="settingsBackupCarName">路虎 卫士 110</h3>
+            <h3 class="font-headline text-sm font-bold" id="settingsBackupCarName">备用车辆</h3>
           </div>
           <div class="flex justify-between items-center">
             <span class="material-symbols-outlined text-on-surface-variant text-xl" data-icon="settings_suggest">settings_suggest</span>
-            <span class="text-[10px] font-thin text-on-surface-variant" id="settingsBackupCarMileage">4500.50 KM</span>
+            <span class="text-[10px] font-thin text-on-surface-variant" id="settingsBackupCarMileage">--</span>
           </div>
         </div>
         <div class="bg-surface-container rounded-lg p-5 aspect-square border-2 border-dashed border-outline-variant/20 flex flex-col items-center justify-center gap-3 hover:bg-surface-container-high transition-colors cursor-pointer" id="addCarCard">
@@ -194,7 +194,7 @@
             </div>
             <div>
               <p class="text-on-surface font-headline font-medium">备份与恢复</p>
-              <p class="text-on-surface-variant text-xs font-thin mt-1" id="settingsLastSync">最后同步：2023.10.24 14:30</p>
+              <p class="text-on-surface-variant text-xs font-thin mt-1" data-page-hydration-gate id="settingsLastSync">最后同步：暂无数据</p>
             </div>
           </div>
           <span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="chevron_right">chevron_right</span>
@@ -207,15 +207,15 @@
         <h2 class="font-headline font-medium text-[1.75rem] text-on-surface">云同步</h2>
         <span class="font-label text-xs text-secondary tracking-widest">SUPABASE</span>
       </div>
-      <div class="bg-surface-container rounded-lg p-6 space-y-5">
+      <div class="bg-surface-container rounded-lg p-6 space-y-5" data-page-hydration-gate>
         <div class="flex items-start gap-5">
           <div class="w-12 h-12 rounded-full bg-primary-fixed/10 flex items-center justify-center">
             <span class="material-symbols-outlined text-primary-fixed" data-icon="cloud_sync">cloud_sync</span>
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-on-surface font-headline font-medium" id="cloudAuthStatus">未登录云同步</p>
-            <p class="text-on-surface-variant text-xs font-thin mt-1" id="cloudAuthHint">登录后可在重装 PWA 后恢复车辆与记录</p>
-            <p class="text-on-surface-variant text-[11px] font-thin mt-2" id="cloudLastSyncStatus">最近云同步：未开始</p>
+            <p class="text-on-surface font-headline font-medium" id="cloudAuthStatus">云同步状态</p>
+            <p class="text-on-surface-variant text-xs font-thin mt-1" id="cloudAuthHint">正在加载账号状态</p>
+            <p class="text-on-surface-variant text-[11px] font-thin mt-2" id="cloudLastSyncStatus">最近云同步：待加载</p>
           </div>
         </div>
         <div class="grid gap-3" id="cloudSignedOutPanel">

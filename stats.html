@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>趋势 - 加油记录 V3.6.3</title>
+  <title>趋势 - 加油记录 V3.6.4</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -97,7 +97,7 @@
       }
     </style>
 </head>
-<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="stats">
+<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="stats" data-page-hydrated="false">
   <header class="app-topbar fixed top-0 w-full z-50 no-border tonal-shift bg-[#0e0e0e]">
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-2">
@@ -114,35 +114,35 @@
       <p class="font-label text-on-surface-variant text-[0.75rem] font-bold uppercase tracking-widest mb-2">本月支出总额</p>
       <div class="flex items-baseline gap-1">
         <span class="text-on-surface-variant text-2xl font-light">¥</span>
-        <h2 class="font-headline text-[3.5rem] font-bold leading-none tracking-tight" id="statsMonthlySpend">4280.50</h2>
+        <h2 class="font-headline text-[3.5rem] font-bold leading-none tracking-tight" data-page-hydration-gate id="statsMonthlySpend">0.00</h2>
       </div>
     </section>
     <div class="grid grid-cols-2 gap-4 mb-8">
-      <div class="col-span-2 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden">
+      <div class="col-span-2 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden" data-page-hydration-gate>
         <div class="relative w-48 h-48 flex items-center justify-center">
           <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
             <circle cx="50" cy="50" fill="transparent" id="statsBaseArc" r="40" stroke="#262626" stroke-width="8"></circle>
-            <circle cx="50" cy="50" fill="transparent" id="statsFuelArc" r="40" stroke="#cafd00" stroke-dasharray="251.2" stroke-dashoffset="100.48" stroke-linecap="round" stroke-width="8"></circle>
-            <circle cx="50" cy="50" fill="transparent" id="statsOtherArc" r="40" stroke="#bf81ff" stroke-dasharray="251.2" stroke-dashoffset="210" stroke-linecap="round" stroke-width="8"></circle>
+            <circle cx="50" cy="50" fill="transparent" id="statsFuelArc" r="40" stroke="#cafd00" stroke-dasharray="0 251.2" stroke-dashoffset="0" stroke-linecap="round" stroke-width="8"></circle>
+            <circle cx="50" cy="50" fill="transparent" id="statsOtherArc" r="40" stroke="#bf81ff" stroke-dasharray="0 251.2" stroke-dashoffset="0" stroke-linecap="round" stroke-width="8"></circle>
           </svg>
           <div class="absolute inset-0 flex flex-col items-center justify-center">
             <span class="text-on-surface-variant text-xs font-bold uppercase">加油占比</span>
-            <span class="text-primary-fixed text-2xl font-bold" id="statsFuelShare">60%</span>
+            <span class="text-primary-fixed text-2xl font-bold" id="statsFuelShare">0%</span>
           </div>
         </div>
       </div>
-      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square">
+      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square" data-page-hydration-gate>
         <span class="material-symbols-outlined text-primary-fixed text-3xl" data-icon="electric_car">electric_car</span>
         <div>
           <p class="text-on-surface-variant text-xs mb-1">平均每日</p>
-          <p class="font-headline text-xl font-bold" id="statsDailyAverage">138.08</p>
+          <p class="font-headline text-xl font-bold" id="statsDailyAverage">0.00</p>
         </div>
       </div>
-      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square">
+      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square" data-page-hydration-gate>
         <span class="material-symbols-outlined text-secondary text-3xl" data-icon="account_balance_wallet">account_balance_wallet</span>
         <div>
           <p class="text-on-surface-variant text-xs mb-1">上月对比</p>
-          <p class="font-headline text-xl font-bold text-error" id="statsMonthCompare">+12%</p>
+          <p class="font-headline text-xl font-bold text-error" id="statsMonthCompare">0%</p>
         </div>
       </div>
     </div>
@@ -151,16 +151,16 @@
         <h3 class="font-headline text-xl font-medium">分类明细</h3>
         <a class="text-secondary font-label text-[0.75rem] font-bold uppercase" href="./logs.html" id="statsViewAllLink">查看全部</a>
       </div>
-      <div class="space-y-2">
+      <div class="space-y-2" data-page-hydration-gate>
         <div class="flex items-center gap-5">
           <div class="w-12 h-12 rounded-full bg-primary-fixed/10 flex items-center justify-center">
             <span class="material-symbols-outlined text-primary-fixed" data-icon="local_gas_station">local_gas_station</span>
           </div>
           <div class="flex-1">
             <p class="font-bold text-on-surface">加油</p>
-            <p class="text-xs text-on-surface-variant" id="statsFuelCount">共计 4 次</p>
+            <p class="text-xs text-on-surface-variant" id="statsFuelCount">暂无记录</p>
           </div>
-          <p class="font-headline font-bold" id="statsFuelAmount">2568.30</p>
+          <p class="font-headline font-bold" id="statsFuelAmount">0.00</p>
         </div>
         <div class="flex items-center gap-5">
           <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
@@ -168,9 +168,9 @@
           </div>
           <div class="flex-1">
             <p class="font-bold text-on-surface">保养</p>
-            <p class="text-xs text-on-surface-variant" id="statsMaintenanceCount">共计 1 次</p>
+            <p class="text-xs text-on-surface-variant" id="statsMaintenanceCount">暂无记录</p>
           </div>
-          <p class="font-headline font-bold" id="statsMaintenanceAmount">1200.00</p>
+          <p class="font-headline font-bold" id="statsMaintenanceAmount">0.00</p>
         </div>
         <div class="flex items-center gap-5">
           <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
@@ -178,9 +178,9 @@
           </div>
           <div class="flex-1">
             <p class="font-bold text-on-surface">洗车</p>
-            <p class="text-xs text-on-surface-variant" id="statsWashCount">共计 3 次</p>
+            <p class="text-xs text-on-surface-variant" id="statsWashCount">暂无记录</p>
           </div>
-          <p class="font-headline font-bold" id="statsWashAmount">150.00</p>
+          <p class="font-headline font-bold" id="statsWashAmount">0.00</p>
         </div>
         <div class="flex items-center gap-5">
           <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
@@ -188,7 +188,7 @@
           </div>
           <div class="flex-1">
             <p class="font-bold text-on-surface">维修</p>
-            <p class="text-xs text-on-surface-variant" id="statsRepairCount">共计 0 次</p>
+            <p class="text-xs text-on-surface-variant" id="statsRepairCount">暂无记录</p>
           </div>
           <p class="font-headline font-bold" id="statsRepairAmount">0.00</p>
         </div>
@@ -198,9 +198,9 @@
           </div>
           <div class="flex-1">
             <p class="font-bold text-on-surface">配件</p>
-            <p class="text-xs text-on-surface-variant" id="statsAccessoryCount">雨刮器等</p>
+            <p class="text-xs text-on-surface-variant" id="statsAccessoryCount">暂无记录</p>
           </div>
-          <p class="font-headline font-bold" id="statsAccessoryAmount">362.20</p>
+          <p class="font-headline font-bold" id="statsAccessoryAmount">0.00</p>
         </div>
         <div class="flex items-center gap-5">
           <div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center">
@@ -208,7 +208,7 @@
           </div>
           <div class="flex-1">
             <p class="font-bold text-on-surface">配饰</p>
-            <p class="text-xs text-on-surface-variant" id="statsDecorationCount">共计 1 次</p>
+            <p class="text-xs text-on-surface-variant" id="statsDecorationCount">暂无记录</p>
           </div>
           <p class="font-headline font-bold" id="statsDecorationAmount">0.00</p>
         </div>
