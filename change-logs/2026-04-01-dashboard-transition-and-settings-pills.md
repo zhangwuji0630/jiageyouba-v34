@@ -1,30 +1,30 @@
-# 2026-04-01 Dashboard Transition And Settings Pills
+# 2026-04-01 看板切换动效与设置偏好按钮修复
 
-## Scope
+## 范围
 
-This pass fixes only two follow-up issues:
+本次仅处理两个后续问题：
 
-- dashboard page flash and overly jumpy entrance motion when switching quickly between pages
-- settings page preference pills appearing too harsh in dark mode
+- 看板页与记录页快速切换时，看板首屏有闪帧且入场动效偏跳。
+- 设置页“录入偏好”按钮在深色模式下视觉过于刺眼。
 
-## Changes Made
+## 实际改动
 
 - `index.html`
-  - Aligned the dashboard static card markup with the final rendered layout so the page no longer flashes the old structure before motion begins.
-  - Marked dashboard hero, cards, and story card as motion targets from first paint.
-  - Added an early dashboard fast-return gate so quick jumps back from other internal pages skip the re-entry animation before the browser paints the page.
+  - 将看板首屏静态结构与最终渲染结构对齐，避免先显示旧结构再重排。
+  - 将看板页英雄区、卡片区、文案卡统一标记为首帧动效目标。
+  - 增加看板快速返回预判门控，短时间内从其他页面返回时跳过重播入场动画。
 - `app.js`
-  - Refined dashboard entrance timing so the hero and main spend card lead with tighter overlap instead of a strong top-to-bottom drop.
-  - Added same-session page visit tracking so rapid returns to the dashboard use immediate reveal instead of replaying the full entrance.
+  - 调整看板动效时序，改为更紧凑的分组进场，降低“自上而下掉落感”。
+  - 增加会话级页面访问记录，快速回看板时直接进入稳态显示。
 - `app.css`
-  - Softened dashboard entrance motion by reducing travel distance and shortening the easing curve.
-  - Added a no-transition rule for dashboard fast returns.
-  - Tuned the dark-mode active state for settings preference pills to a dimmer tinted accent instead of a bright solid block.
+  - 缩短看板入场位移与时长，缓和动效观感。
+  - 增加看板快速返回场景下的无过渡显示规则。
+  - 优化深色模式下偏好按钮激活态颜色，改为低饱和浅色强调而非高亮刺眼块。
 
-## Verification
+## 验证
 
-- Local browser verification on mobile viewport
-- Confirmed dashboard no longer flashes the old card layout before motion starts
-- Confirmed rapid internal returns can render the dashboard immediately without replaying the entrance
-- Confirmed dashboard entrance feels softer and less top-to-bottom on a cold load
-- Confirmed settings preference active pills in dark mode no longer render as bright green with harsh light text
+- 已在本地移动端视口进行浏览器验证。
+- 已确认看板页不再先闪旧布局再进入动效。
+- 已确认快速切回看板时可直接稳态显示，不强制重播入场动画。
+- 已确认冷启动看板动效更柔和，顶部下落感显著降低。
+- 已确认设置页偏好按钮在深色模式下可读性与观感提升。
