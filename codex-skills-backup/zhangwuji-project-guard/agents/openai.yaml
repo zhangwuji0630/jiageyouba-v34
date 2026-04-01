@@ -1,0 +1,4 @@
+interface:
+  display_name: "张无忌项目守则"
+  short_description: "按中文协作规则执行项目改动、复查、记录与交接维护"
+  default_prompt: "Use $zhangwuji-project-guard to continue this project with Chinese logs, strict scope, review discipline, and handoff continuity."
