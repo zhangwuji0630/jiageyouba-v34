@@ -69,6 +69,24 @@ body {
   transition: background-color 180ms ease, color 180ms ease;
 }
 
+body.app-page-leaving {
+  pointer-events: none;
+}
+
+body.app-page-leaving::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--app-bg);
+  z-index: 9999;
+}
+
+body.app-page-leaving .app-topbar,
+body.app-page-leaving .app-main,
+body.app-page-leaving .app-bottom-nav {
+  opacity: 0 !important;
+}
+
 [hidden] {
   display: none !important;
 }
@@ -177,6 +195,10 @@ body[data-page-hydrated="false"] [data-page-hydration-gate] {
 }
 
 [data-runtime-copy]:not([data-runtime-copy="ready"]) {
+  visibility: hidden;
+}
+
+[data-runtime-copy-group]:not([data-runtime-copy-group="ready"]) {
   visibility: hidden;
 }
 

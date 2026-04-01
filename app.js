@@ -26,7 +26,7 @@ const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const PAGE_VISIT_STORAGE_KEY = `${THEME_STORAGE_KEY}:page-visit`;
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
-const APP_VERSION = "3.6.4";
+const APP_VERSION = "3.6.5";
 const DASHBOARD_FAST_RETURN_WINDOW_MS = 4500;
 const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
@@ -217,6 +217,7 @@ let databasePromise = null;
 let toastTimer = 0;
 let systemThemeWatcherBound = false;
 let cloudSyncTimer = 0;
+let pendingNavigationUrl = "";
 
 const cloudState = {
   client: null,
@@ -313,7 +314,71 @@ function setText(id, value) {
   const element = document.getElementById(id);
   if (element) {
     element.textContent = value;
+    markRuntimeCopyReady(element);
   }
+}
+
+function isModifiedNavigationEvent(event) {
+  return Boolean(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
+}
+
+function preparePageLeave() {
+  document.body?.classList.add("app-page-leaving");
+}
+
+function resolveNavigationUrl(url) {
+  if (!url) {
+    return null;
+  }
+
+  try {
+    return new URL(url, window.location.href);
+  } catch (error) {
+    console.error("导航地址无效", error);
+    return null;
+  }
+}
+
+function navigateTo(url) {
+  const nextUrl = resolveNavigationUrl(url);
+  if (!nextUrl || nextUrl.href === window.location.href || pendingNavigationUrl === nextUrl.href) {
+    return;
+  }
+
+  pendingNavigationUrl = nextUrl.href;
+  preparePageLeave();
+
+  const commitNavigation = () => {
+    window.location.href = nextUrl.href;
+  };
+
+  if (typeof window.requestAnimationFrame === "function") {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(commitNavigation);
+    });
+    return;
+  }
+
+  window.setTimeout(commitNavigation, 34);
+}
+
+function getAnchorNavigationUrl(anchor) {
+  const href = anchor.getAttribute("href") || "";
+  if (!href || href.startsWith("#")) {
+    return null;
+  }
+
+  const nextUrl = resolveNavigationUrl(href);
+  if (!nextUrl) {
+    return null;
+  }
+
+  const currentUrl = new URL(window.location.href);
+  if (nextUrl.origin !== currentUrl.origin || nextUrl.href === currentUrl.href) {
+    return null;
+  }
+
+  return nextUrl.href;
 }
 
 function getCategoryLabel(kind) {
@@ -1644,8 +1709,17 @@ function cycleThemeMode(themeMode) {
 }
 
 function markRuntimeCopyReady(element) {
-  if (element?.hasAttribute("data-runtime-copy")) {
+  if (!element) {
+    return;
+  }
+
+  if (element.hasAttribute("data-runtime-copy")) {
     element.dataset.runtimeCopy = "ready";
+  }
+
+  const group = element.closest("[data-runtime-copy-group]");
+  if (group) {
+    group.dataset.runtimeCopyGroup = "ready";
   }
 }
 
@@ -2073,8 +2147,40 @@ function registerServiceWorker() {
 function bindThemeEntryPoints() {
   ["dashboardThemeHint", "addThemeHint", "statsThemeHint", "logsThemeHint"].forEach((id) => {
     document.getElementById(id)?.addEventListener("click", () => {
-      window.location.href = "./settings.html#themePreferences";
+      navigateTo("./settings.html#themePreferences");
     });
+  });
+}
+
+function bindPageNavigationGuards() {
+  document.querySelectorAll('a[href]').forEach((anchor) => {
+    if (anchor.dataset.leaveBound === "true") {
+      return;
+    }
+
+    anchor.addEventListener("click", (event) => {
+      if (event.defaultPrevented || (event.button !== undefined && event.button !== 0) || isModifiedNavigationEvent(event)) {
+        return;
+      }
+
+      if (anchor.target && anchor.target !== "_self") {
+        return;
+      }
+
+      if (anchor.hasAttribute("download")) {
+        return;
+      }
+
+      const nextUrl = getAnchorNavigationUrl(anchor);
+      if (!nextUrl) {
+        return;
+      }
+
+      event.preventDefault();
+      navigateTo(nextUrl);
+    });
+
+    anchor.dataset.leaveBound = "true";
   });
 }
 
@@ -2482,7 +2588,7 @@ function renderHistoryList(snapshot) {
         return;
       }
 
-      window.location.href = `./add.html?id=${encodeURIComponent(record.id)}`;
+      navigateTo(`./add.html?id=${encodeURIComponent(record.id)}`);
     });
   });
 
@@ -2545,12 +2651,12 @@ function renderStatsPage(snapshot) {
     row.setAttribute("role", "link");
     row.setAttribute("aria-label", `查看${getCategoryLabel(kind)}历史`);
     row.onclick = () => {
-      window.location.href = buildLogsUrl(kind);
+      navigateTo(buildLogsUrl(kind));
     };
     row.onkeydown = (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        window.location.href = buildLogsUrl(kind);
+        navigateTo(buildLogsUrl(kind));
       }
     };
   });
@@ -2975,7 +3081,7 @@ async function initAddPage(snapshot) {
     }
 
     await saveSnapshot(nextSnapshot);
-    window.location.href = editingRecord ? "./logs.html?flash=updated" : "./logs.html?flash=saved";
+    navigateTo(editingRecord ? "./logs.html?flash=updated" : "./logs.html?flash=saved");
   });
 
   syncModeVisibility();
@@ -3236,7 +3342,7 @@ async function initSettingsPage(snapshot) {
     try {
       const imported = normalizeImportedSnapshot(JSON.parse(await file.text()));
       await saveSnapshot(imported, [{ key: "lastImportedAt", value: nowIso() }]);
-      window.location.href = "./settings.html?flash=imported";
+      navigateTo("./settings.html?flash=imported");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "导入失败，请检查备份文件", "warning");
     } finally {
@@ -3350,7 +3456,7 @@ async function initSettingsPage(snapshot) {
       if (!isNonFuelKind(kind)) {
         return;
       }
-      window.location.href = `./add.html?kind=${encodeURIComponent(kind)}`;
+      navigateTo(`./add.html?kind=${encodeURIComponent(kind)}`);
     });
   });
 }
@@ -3366,6 +3472,7 @@ async function initPage() {
     console.error(error);
   });
   bindThemeEntryPoints();
+  bindPageNavigationGuards();
   showFlash();
 
   let snapshot = await loadSnapshot();

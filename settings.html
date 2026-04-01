@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>设置 - 加油记录 V3.6.4</title>
+  <title>设置 - 加油记录 V3.6.5</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -112,7 +112,7 @@
     <section>
       <div class="flex justify-between items-end mb-6">
         <h2 class="font-headline font-medium text-[1.75rem] text-on-surface">我的车库</h2>
-        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.6.4</span>
+        <span class="font-label text-xs text-secondary tracking-widest">GARAGE V3.6.5</span>
       </div>
       <div class="grid grid-cols-2 gap-4">
         <div class="col-span-2 app-quote-card rounded-lg p-6 relative overflow-hidden group cursor-pointer border border-white/5" data-page-hydration-gate id="currentCarCard">
@@ -162,7 +162,7 @@
         <div class="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p class="text-on-surface font-headline font-medium">主题模式</p>
-            <p class="text-on-surface-variant text-xs font-thin mt-1" id="themeModeHint">跟随系统自动切换视觉主题</p>
+            <p class="text-on-surface-variant text-xs font-thin mt-1" data-runtime-copy id="themeModeHint">跟随系统自动切换视觉主题</p>
           </div>
           <div class="flex bg-surface-container-highest rounded-full p-1" data-theme-group>
             <button class="px-4 py-1.5 rounded-full text-[10px] font-bold toggle-pill toggle-pill--active" data-theme="system" type="button">跟随系统</button>
@@ -257,7 +257,7 @@
         </div>
       </div>
     </section>
-    <section class="page-footer-quote py-12 text-center">
+    <section class="page-footer-quote py-12 text-center" data-runtime-copy-group>
       <p class="text-on-surface-variant font-body font-thin italic tracking-widest text-sm opacity-60" data-runtime-copy id="settingsFooterQuote">
         保持热爱，奔赴山海      </p>
       <div class="mt-4 flex justify-center gap-1">

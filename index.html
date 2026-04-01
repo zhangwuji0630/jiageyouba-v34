@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>看板 - 加油记录 V3.6.4</title>
+  <title>看板 - 加油记录 V3.6.5</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -174,7 +174,7 @@
       </div>
     </div>
     <section class="app-dashboard-story mt-6">
-      <div class="app-dashboard-story-card relative overflow-hidden rounded-lg min-h-[180px] group cursor-pointer select-none app-motion-enter" id="dashboardStoryCard" role="button" tabindex="0" aria-label="切换看板文案">
+      <div class="app-dashboard-story-card relative overflow-hidden rounded-lg min-h-[180px] group cursor-pointer select-none app-motion-enter" data-runtime-copy-group id="dashboardStoryCard" role="button" tabindex="0" aria-label="切换看板文案">
         <img alt="原版看板文案卡底图" class="absolute inset-0 w-full h-full object-cover opacity-70 transition-all duration-700" src="./assets/dashboard-story-original.png"/>
         <div class="absolute inset-0 bg-gradient-to-t from-surface/90 via-surface/20 to-transparent"></div>
         <div class="relative h-full p-6 flex flex-col justify-end">
@@ -182,7 +182,7 @@
         </div>
       </div>
     </section>
-    <section class="page-footer-quote mt-12 py-8 border-t border-outline-variant/10">
+    <section class="page-footer-quote mt-12 py-8 border-t border-outline-variant/10" data-runtime-copy-group>
       <div class="flex flex-col items-center text-center px-4">
         <span class="material-symbols-outlined text-primary-fixed/30 mb-4 scale-150" data-icon="format_quote">format_quote</span>
         <p class="font-body font-light text-on-surface-variant italic leading-relaxed text-sm" data-runtime-copy id="dashboardFooterQuote">

@@ -2,7 +2,7 @@ create table if not exists public.user_snapshots (
   user_id uuid primary key references auth.users (id) on delete cascade,
   snapshot jsonb not null default '{}'::jsonb,
   schema_version integer not null default 1,
-  app_version text not null default '3.6.4',
+  app_version text not null default '3.6.5',
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
