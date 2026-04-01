@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>看板 - 加油记录 V3.6.2</title>
+  <title>看板 - 加油记录 V3.6.3</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -118,7 +118,7 @@
       }
     </style>
 </head>
-<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="dashboard">
+<body class="app-shell font-body selection:bg-primary-fixed selection:text-on-primary-fixed" data-page="dashboard" data-dashboard-hydrated="false">
   <header class="app-topbar fixed top-0 w-full z-50 bg-[#0e0e0e] no-border tonal-shift">
     <div class="flex justify-between items-center h-16 px-6 w-full max-w-md mx-auto">
       <div class="flex items-center gap-3 active:scale-95 duration-200 cursor-pointer">
@@ -137,11 +137,11 @@
       <div class="col-span-2 bg-surface-container rounded-lg p-6 flex flex-col justify-between min-h-[180px] app-motion-enter">
         <div>
           <span class="font-label text-on-surface-variant text-[11px] uppercase tracking-widest">本月花费 (元)</span>
-          <div class="font-headline text-[3.5rem] font-bold leading-none mt-4 tracking-tighter" id="dashboardMonthlySpend">1250.50</div>
+          <div class="font-headline text-[3.5rem] font-bold leading-none mt-4 tracking-tighter" data-dashboard-hydration-gate id="dashboardMonthlySpend">0.00</div>
         </div>
         <div class="flex items-center gap-2 text-primary-fixed mt-4">
           <span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
-          <span class="font-label text-[10px]" id="dashboardMonthlyDelta">比上月增长 12%</span>
+          <span class="font-label text-[10px]" data-dashboard-hydration-gate id="dashboardMonthlyDelta">较上月暂无变化</span>
         </div>
       </div>
       <div class="col-span-2 grid grid-cols-3 gap-3" id="dashboardMiniCardsRow">
@@ -149,8 +149,8 @@
           <span class="material-symbols-outlined text-secondary text-2xl" data-icon="distance">distance</span>
           <div>
             <span class="font-label text-on-surface-variant text-[10px] uppercase block mb-1">本月里程</span>
-            <div class="font-headline text-2xl font-bold" id="dashboardMonthlyMileage">1420</div>
-            <span class="font-label text-on-surface-variant text-[10px]" id="dashboardMileageUnit">公里</span>
+            <div class="font-headline text-2xl font-bold" data-dashboard-hydration-gate id="dashboardMonthlyMileage">0</div>
+            <span class="font-label text-on-surface-variant text-[10px]" data-dashboard-hydration-gate id="dashboardMileageUnit">公里</span>
           </div>
         </div>
         <div class="bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between app-motion-enter">
@@ -159,16 +159,16 @@
           </div>
           <div>
             <span class="font-label text-on-surface-variant text-[10px] uppercase block mb-1">平均油耗</span>
-            <div class="font-headline text-2xl font-bold" id="dashboardAvgEfficiency">7.2</div>
+            <div class="font-headline text-2xl font-bold" data-dashboard-hydration-gate id="dashboardAvgEfficiency">--</div>
             <span class="font-label text-on-surface-variant text-[10px]">按当前显示单位换算</span>
           </div>
         </div>
         <div class="bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between app-motion-enter" id="dashboardCostPerDistanceCard">
           <span class="material-symbols-outlined text-primary-fixed text-2xl" data-icon="payments">payments</span>
           <div>
-            <span class="font-label text-on-surface-variant text-[10px] uppercase block mb-1" id="dashboardCostPerDistanceLabel">每公里花费</span>
-            <div class="font-headline text-2xl font-bold" id="dashboardCostPerDistance">0.00</div>
-            <span class="font-label text-on-surface-variant text-[10px]" id="dashboardCostPerDistanceUnit">CNY / KM</span>
+            <span class="font-label text-on-surface-variant text-[10px] uppercase block mb-1" data-dashboard-hydration-gate id="dashboardCostPerDistanceLabel">每公里花费</span>
+            <div class="font-headline text-2xl font-bold" data-dashboard-hydration-gate id="dashboardCostPerDistance">--</div>
+            <span class="font-label text-on-surface-variant text-[10px]" data-dashboard-hydration-gate id="dashboardCostPerDistanceUnit">CNY / KM</span>
           </div>
         </div>
       </div>

@@ -168,6 +168,10 @@ html.dashboard-fast-return body[data-page="dashboard"] .app-motion-enter {
   transition: none;
 }
 
+html.dashboard-fast-return body[data-page="dashboard"][data-dashboard-hydrated="false"] [data-dashboard-hydration-gate] {
+  visibility: hidden;
+}
+
 .app-stats-category-row {
   opacity: 0;
   transform: translateY(14px);

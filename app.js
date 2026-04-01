@@ -26,7 +26,7 @@ const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const PAGE_VISIT_STORAGE_KEY = `${THEME_STORAGE_KEY}:page-visit`;
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
-const APP_VERSION = "3.6.2";
+const APP_VERSION = "3.6.3";
 const DASHBOARD_FAST_RETURN_WINDOW_MS = 4500;
 const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
@@ -257,6 +257,7 @@ function roundNumber(value, digits = 2) {
 
 function formatNumber(value, digits = 2) {
   return new Intl.NumberFormat("zh-CN", {
+    useGrouping: false,
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   }).format(asNumber(value));
@@ -264,6 +265,7 @@ function formatNumber(value, digits = 2) {
 
 function formatInteger(value) {
   return new Intl.NumberFormat("zh-CN", {
+    useGrouping: false,
     maximumFractionDigits: 0,
   }).format(asNumber(value));
 }
@@ -1843,6 +1845,12 @@ function playDashboardEntranceMotion(options = {}) {
   });
 }
 
+function setDashboardHydrated(isHydrated) {
+  if (document.body?.dataset.page === "dashboard") {
+    document.body.dataset.dashboardHydrated = isHydrated ? "true" : "false";
+  }
+}
+
 function animateStatsDonut(fuelShare, otherShare) {
   const fuelArc = document.getElementById("statsFuelArc");
   const otherArc = document.getElementById("statsOtherArc");
@@ -2087,9 +2095,9 @@ function ensureDashboardMiniCardsLayout() {
     costCard.innerHTML = `
       <span class="material-symbols-outlined text-primary-fixed text-2xl" data-icon="payments">payments</span>
       <div>
-        <span class="font-label text-on-surface-variant text-[10px] uppercase block mb-1" id="dashboardCostPerDistanceLabel">每公里花费</span>
-        <div class="font-headline text-2xl font-bold" id="dashboardCostPerDistance">0.00</div>
-        <span class="font-label text-on-surface-variant text-[10px]" id="dashboardCostPerDistanceUnit">CNY / KM</span>
+        <span class="font-label text-on-surface-variant text-[10px] uppercase block mb-1" data-dashboard-hydration-gate id="dashboardCostPerDistanceLabel">每公里花费</span>
+        <div class="font-headline text-2xl font-bold" data-dashboard-hydration-gate id="dashboardCostPerDistance">--</div>
+        <span class="font-label text-on-surface-variant text-[10px]" data-dashboard-hydration-gate id="dashboardCostPerDistanceUnit">CNY / KM</span>
       </div>
     `;
   }
@@ -2211,11 +2219,13 @@ function validateOdometerSequence(records, candidateRecord) {
 function renderDashboardPage(snapshot, options = {}) {
   const activeVehicle = getActiveVehicle(snapshot);
   if (!activeVehicle) {
+    setDashboardHydrated(true);
     return;
   }
 
   ensureDashboardMiniCardsLayout();
 
+  const immediate = options.immediateMotion === true;
   const unitMode = snapshot.settings.unit;
   const analytics = getVehicleAnalytics(snapshot, activeVehicle.id);
   const monthlySpend = sumAmounts(analytics.currentMonthRecords);
@@ -2228,14 +2238,14 @@ function renderDashboardPage(snapshot, options = {}) {
     ? (unitMode === "imperial" ? 235.214583 / monthlyAvgEfficiency : monthlyAvgEfficiency)
     : 0;
 
-  animateNumberText("dashboardMonthlySpend", monthlySpend, { digits: 2, duration: 620 });
+  animateNumberText("dashboardMonthlySpend", monthlySpend, { digits: 2, duration: immediate ? 0 : 620 });
   setText("dashboardMonthlyDelta", getMonthDeltaLabel(monthlySpend, previousMonthlySpend));
-  animateNumberText("dashboardMonthlyMileage", displayedMileage, { digits: 0, duration: 560 });
+  animateNumberText("dashboardMonthlyMileage", displayedMileage, { digits: 0, duration: immediate ? 0 : 560 });
   setText("dashboardMileageUnit", formatDistanceUnit(unitMode));
   if (monthlyAvgEfficiency > 0) {
     animateNumberText("dashboardAvgEfficiency", displayedEfficiency, {
       digits: 1,
-      duration: 580,
+      duration: immediate ? 0 : 580,
       formatter: (value) =>
         unitMode === "imperial"
           ? `${formatNumber(value, 1)} MPG`
@@ -2246,14 +2256,15 @@ function renderDashboardPage(snapshot, options = {}) {
   }
   setText("dashboardCostPerDistanceLabel", getCostPerDistanceLabel(unitMode));
   if (monthlyDistance > 0) {
-    animateNumberText("dashboardCostPerDistance", costPerDistance, { digits: 2, duration: 600 });
+    animateNumberText("dashboardCostPerDistance", costPerDistance, { digits: 2, duration: immediate ? 0 : 600 });
   } else {
     setText("dashboardCostPerDistance", "--");
   }
   setText("dashboardCostPerDistanceUnit", getCostPerDistanceUnit(unitMode));
   setText("dashboardCurrentCarName", activeVehicle.name);
+  setDashboardHydrated(true);
   playDashboardEntranceMotion({
-    immediate: options.immediateMotion,
+    immediate,
   });
 }
 
