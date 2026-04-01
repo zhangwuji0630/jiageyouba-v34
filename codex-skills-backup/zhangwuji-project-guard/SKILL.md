@@ -17,6 +17,7 @@ Keep this user's long-running project work consistent across sessions and device
   - `docs/最新交接.md`
   - the latest relevant files in `change-logs/`
 - If the task also matches a domain skill, use both. This skill governs collaboration and continuity; the domain skill governs implementation.
+- If the user raised a question, challenge, correction, or explanation request, answer it directly first before using tools or making edits. Do not jump straight into execution.
 - State a scope contract before edits:
   1. exact requested changes
   2. adjacent surfaces that stay untouched
@@ -39,6 +40,8 @@ Keep this user's long-running project work consistent across sessions and device
 - Do not substitute a different asset or version when the user asked to restore the original.
 - If an extra file or side effect becomes necessary, call it out before broadening the change when feasible; otherwise document it explicitly in the final report and change log.
 - After editing, re-open the diff and remove incidental edits.
+- When one reported issue is likely part of a same-class pattern, audit the whole class first and fix it in one bounded pass instead of waiting for repeated user reports.
+- Do not claim the issue is fully fixed until same-class spillover has been checked on the directly related surfaces.
 
 ## Verification Discipline
 

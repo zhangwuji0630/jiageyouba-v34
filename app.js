@@ -1643,6 +1643,12 @@ function cycleThemeMode(themeMode) {
   return THEME_ORDER[(index + 1 + THEME_ORDER.length) % THEME_ORDER.length];
 }
 
+function markRuntimeCopyReady(element) {
+  if (element?.hasAttribute("data-runtime-copy")) {
+    element.dataset.runtimeCopy = "ready";
+  }
+}
+
 function renderFooterQuote(page) {
   const quoteMap = {
     dashboard: "dashboardFooterQuote",
@@ -1669,6 +1675,7 @@ function renderFooterQuote(page) {
   }
 
   element.textContent = nextQuote;
+  markRuntimeCopyReady(element);
   window.sessionStorage.setItem(sessionKey, nextQuote);
 }
 
@@ -1686,6 +1693,7 @@ function renderDashboardStoryQuote() {
     window.setTimeout(() => {
       quoteElement.textContent = quote;
       quoteElement.classList.remove("is-rotating");
+      markRuntimeCopyReady(quoteElement);
     }, 120);
     window.sessionStorage.setItem(sessionKey, quote);
   };

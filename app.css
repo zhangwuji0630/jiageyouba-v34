@@ -176,6 +176,10 @@ body[data-page-hydrated="false"] [data-page-hydration-gate] {
   visibility: hidden;
 }
 
+[data-runtime-copy]:not([data-runtime-copy="ready"]) {
+  visibility: hidden;
+}
+
 .app-stats-category-row {
   opacity: 0;
   transform: translateY(14px);
