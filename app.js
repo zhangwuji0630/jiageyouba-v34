@@ -23,9 +23,11 @@ const FUEL_TYPES = ["92#", "95#", "98#"];
 const MILES_PER_KM = 0.621371;
 const DONUT_CIRCUMFERENCE = 251.2;
 const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
+const PAGE_VISIT_STORAGE_KEY = `${THEME_STORAGE_KEY}:page-visit`;
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
 const APP_VERSION = "3.6.2";
+const DASHBOARD_FAST_RETURN_WINDOW_MS = 4500;
 const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
 const SUPABASE_REDIRECT_URL = "https://zhangwuji0630.github.io/jiageyouba-v34/settings.html";
@@ -1494,6 +1496,59 @@ function readCachedThemeMode() {
   }
 }
 
+function readLastPageVisit() {
+  try {
+    const raw = window.sessionStorage.getItem(PAGE_VISIT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    const page = typeof parsed?.page === "string" ? parsed.page : "";
+    const at = Number(parsed?.at);
+    if (!page || !Number.isFinite(at)) {
+      return null;
+    }
+
+    return { page, at };
+  } catch {
+    return null;
+  }
+}
+
+function rememberCurrentPageVisit() {
+  const page = document.body.dataset.page || "";
+  if (!page) {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      PAGE_VISIT_STORAGE_KEY,
+      JSON.stringify({
+        page,
+        at: Date.now(),
+      })
+    );
+  } catch {
+    // Ignore cache write failures.
+  }
+}
+
+function shouldSkipDashboardEntranceMotion() {
+  const navigationEntry = performance.getEntriesByType?.("navigation")?.[0];
+  if (navigationEntry?.type === "back_forward") {
+    return true;
+  }
+
+  const lastVisit = readLastPageVisit();
+  if (!lastVisit || lastVisit.page === "dashboard") {
+    return false;
+  }
+
+  return Date.now() - lastVisit.at <= DASHBOARD_FAST_RETURN_WINDOW_MS;
+}
+
 function writeCachedThemeMode(themeMode) {
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
@@ -1741,6 +1796,7 @@ function animatePercentageText(id, targetValue, options = {}) {
 function playEntranceMotion(elements = [], options = {}) {
   const baseDelay = options.baseDelay ?? 0;
   const stepDelay = options.stepDelay ?? 72;
+  const immediate = options.immediate ?? false;
 
   elements.forEach((element, index) => {
     if (!element) {
@@ -1748,7 +1804,7 @@ function playEntranceMotion(elements = [], options = {}) {
     }
 
     element.classList.add("app-motion-enter");
-    if (prefersReducedMotion()) {
+    if (prefersReducedMotion() || immediate) {
       element.classList.add("is-visible");
       return;
     }
@@ -1764,14 +1820,26 @@ function playEntranceMotion(elements = [], options = {}) {
   });
 }
 
-function playDashboardEntranceMotion() {
+function playDashboardEntranceMotion(options = {}) {
   const hero = document.querySelector('.app-shell[data-page="dashboard"] .app-page-hero');
   const spendCard = document.getElementById("dashboardMonthlySpend")?.closest(".bg-surface-container");
   const miniCards = Array.from(document.querySelectorAll("#dashboardMiniCardsRow > .bg-surface-container"));
   const storyCard = document.getElementById("dashboardStoryCard");
-  playEntranceMotion([hero, spendCard, ...miniCards, storyCard], {
+  const immediate = options.immediate ?? false;
+  playEntranceMotion([hero, spendCard], {
+    immediate,
+    baseDelay: 0,
+    stepDelay: 18,
+  });
+  playEntranceMotion(miniCards, {
+    immediate,
     baseDelay: 20,
-    stepDelay: 72,
+    stepDelay: 16,
+  });
+  playEntranceMotion([storyCard], {
+    immediate,
+    baseDelay: 34,
+    stepDelay: 0,
   });
 }
 
@@ -2006,7 +2074,7 @@ function ensureDashboardMiniCardsLayout() {
   }
 
   [mileageCard, efficiencyCard].forEach((card) => {
-    card.className = "bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between";
+    card.className = "bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between app-motion-enter";
     card.classList.remove("aspect-square");
     row.appendChild(card);
   });
@@ -2015,7 +2083,7 @@ function ensureDashboardMiniCardsLayout() {
   if (!costCard) {
     costCard = document.createElement("div");
     costCard.id = "dashboardCostPerDistanceCard";
-    costCard.className = "bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between";
+    costCard.className = "bg-surface-container rounded-lg p-4 min-h-[118px] flex flex-col justify-between app-motion-enter";
     costCard.innerHTML = `
       <span class="material-symbols-outlined text-primary-fixed text-2xl" data-icon="payments">payments</span>
       <div>
@@ -2140,7 +2208,7 @@ function validateOdometerSequence(records, candidateRecord) {
   return "";
 }
 
-function renderDashboardPage(snapshot) {
+function renderDashboardPage(snapshot, options = {}) {
   const activeVehicle = getActiveVehicle(snapshot);
   if (!activeVehicle) {
     return;
@@ -2184,7 +2252,9 @@ function renderDashboardPage(snapshot) {
   }
   setText("dashboardCostPerDistanceUnit", getCostPerDistanceUnit(unitMode));
   setText("dashboardCurrentCarName", activeVehicle.name);
-  playDashboardEntranceMotion();
+  playDashboardEntranceMotion({
+    immediate: options.immediateMotion,
+  });
 }
 
 function buildEmptyHistoryMarkup(kind = "") {
@@ -3252,6 +3322,8 @@ async function initPage() {
   applyTheme(readCachedThemeMode());
   bindSystemThemeWatcher();
   registerServiceWorker();
+  const pageName = document.body.dataset.page || "";
+  const skipDashboardEntranceMotion = pageName === "dashboard" && shouldSkipDashboardEntranceMotion();
   await bootstrapDatabase();
   await ensureSupabaseClient().catch((error) => {
     console.error(error);
@@ -3265,9 +3337,11 @@ async function initPage() {
   }
   applyTheme(snapshot.settings.theme);
 
-  switch (document.body.dataset.page) {
+  switch (pageName) {
     case "dashboard":
-      renderDashboardPage(snapshot);
+      renderDashboardPage(snapshot, {
+        immediateMotion: skipDashboardEntranceMotion,
+      });
       renderDashboardStoryQuote();
       break;
     case "add":
@@ -3286,8 +3360,9 @@ async function initPage() {
       break;
   }
 
-  renderFooterQuote(document.body.dataset.page);
+  renderFooterQuote(pageName);
   await renderCloudAuthState(snapshot);
+  rememberCurrentPageVisit();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
