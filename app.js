@@ -26,7 +26,7 @@ const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const PAGE_VISIT_STORAGE_KEY = `${THEME_STORAGE_KEY}:page-visit`;
 const THEME_ORDER = ["dark", "light", "system"];
 const MAX_MANAGED_VEHICLES = 2;
-const APP_VERSION = "3.6.6";
+const APP_VERSION = "3.6.7";
 const DASHBOARD_FAST_RETURN_WINDOW_MS = 4500;
 const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
@@ -217,8 +217,6 @@ let databasePromise = null;
 let toastTimer = 0;
 let systemThemeWatcherBound = false;
 let cloudSyncTimer = 0;
-let pendingNavigationUrl = "";
-
 const cloudState = {
   client: null,
   session: null,
@@ -318,14 +316,6 @@ function setText(id, value) {
   }
 }
 
-function isModifiedNavigationEvent(event) {
-  return Boolean(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey);
-}
-
-function preparePageLeave() {
-  document.body?.classList.add("app-page-leaving");
-}
-
 function resolveNavigationUrl(url) {
   if (!url) {
     return null;
@@ -341,44 +331,10 @@ function resolveNavigationUrl(url) {
 
 function navigateTo(url) {
   const nextUrl = resolveNavigationUrl(url);
-  if (!nextUrl || nextUrl.href === window.location.href || pendingNavigationUrl === nextUrl.href) {
+  if (!nextUrl || nextUrl.href === window.location.href) {
     return;
   }
-
-  pendingNavigationUrl = nextUrl.href;
-  preparePageLeave();
-
-  const commitNavigation = () => {
-    window.location.href = nextUrl.href;
-  };
-
-  if (typeof window.requestAnimationFrame === "function") {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(commitNavigation);
-    });
-    return;
-  }
-
-  window.setTimeout(commitNavigation, 34);
-}
-
-function getAnchorNavigationUrl(anchor) {
-  const href = anchor.getAttribute("href") || "";
-  if (!href || href.startsWith("#")) {
-    return null;
-  }
-
-  const nextUrl = resolveNavigationUrl(href);
-  if (!nextUrl) {
-    return null;
-  }
-
-  const currentUrl = new URL(window.location.href);
-  if (nextUrl.origin !== currentUrl.origin || nextUrl.href === currentUrl.href) {
-    return null;
-  }
-
-  return nextUrl.href;
+  window.location.href = nextUrl.href;
 }
 
 function getCategoryLabel(kind) {
@@ -1716,11 +1672,6 @@ function markRuntimeCopyReady(element) {
   if (element.hasAttribute("data-runtime-copy")) {
     element.dataset.runtimeCopy = "ready";
   }
-
-  const group = element.closest("[data-runtime-copy-group]");
-  if (group) {
-    group.dataset.runtimeCopyGroup = "ready";
-  }
 }
 
 function renderFooterQuote(page) {
@@ -2152,38 +2103,6 @@ function bindThemeEntryPoints() {
   });
 }
 
-function bindPageNavigationGuards() {
-  document.querySelectorAll('a[href]').forEach((anchor) => {
-    if (anchor.dataset.leaveBound === "true") {
-      return;
-    }
-
-    anchor.addEventListener("click", (event) => {
-      if (event.defaultPrevented || (event.button !== undefined && event.button !== 0) || isModifiedNavigationEvent(event)) {
-        return;
-      }
-
-      if (anchor.target && anchor.target !== "_self") {
-        return;
-      }
-
-      if (anchor.hasAttribute("download")) {
-        return;
-      }
-
-      const nextUrl = getAnchorNavigationUrl(anchor);
-      if (!nextUrl) {
-        return;
-      }
-
-      event.preventDefault();
-      navigateTo(nextUrl);
-    });
-
-    anchor.dataset.leaveBound = "true";
-  });
-}
-
 function ensureDashboardMiniCardsLayout() {
   const spendCard = document.getElementById("dashboardMonthlySpend")?.closest(".bg-surface-container");
   const mileageCard = document.getElementById("dashboardMonthlyMileage")?.closest(".bg-surface-container");
@@ -2438,8 +2357,15 @@ function getHistoryCardMetrics(record, efficiencyByRecordId, unitMode) {
 
 function renderHistoryList(snapshot) {
   const list = document.getElementById("historyList");
+  if (!list) {
+    setPageHydrated(true);
+    return;
+  }
+
   const activeVehicle = getActiveVehicle(snapshot);
-  if (!list || !activeVehicle) {
+  if (!activeVehicle) {
+    setText("logsTotalSpend", formatNumber(0, 2));
+    list.innerHTML = buildEmptyHistoryMarkup(getHistoryFilterKind());
     setPageHydrated(true);
     return;
   }
@@ -3472,7 +3398,6 @@ async function initPage() {
     console.error(error);
   });
   bindThemeEntryPoints();
-  bindPageNavigationGuards();
   showFlash();
 
   let snapshot = await loadSnapshot();

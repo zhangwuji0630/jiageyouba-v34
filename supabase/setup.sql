@@ -2,7 +2,7 @@ create table if not exists public.user_snapshots (
   user_id uuid primary key references auth.users (id) on delete cascade,
   snapshot jsonb not null default '{}'::jsonb,
   schema_version integer not null default 1,
-  app_version text not null default '3.6.6',
+  app_version text not null default '3.6.7',
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
@@ -49,4 +49,3 @@ using ((select auth.uid()) = user_id)
 with check ((select auth.uid()) = user_id);
 
 grant select, insert, update on public.user_snapshots to authenticated;
-

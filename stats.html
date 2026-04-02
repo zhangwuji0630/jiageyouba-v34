@@ -7,7 +7,7 @@
   <meta content="yes" name="apple-mobile-web-app-capable"/>
   <meta content="default" name="apple-mobile-web-app-status-bar-style"/>
   <meta content="加油记录" name="apple-mobile-web-app-title"/>
-  <title>趋势 - 加油记录 V3.6.6</title>
+  <title>趋势 - 加油记录 V3.6.7</title>
   <link href="./manifest.webmanifest" rel="manifest"/>
   <link href="./icons/icon-192.png" rel="icon" sizes="192x192" type="image/png"/>
   <link href="./icons/apple-touch-icon.png" rel="apple-touch-icon"/>
@@ -112,13 +112,13 @@
   <main class="app-main px-6 max-w-md mx-auto min-h-screen">
     <section class="app-page-hero mb-12">
       <p class="font-label text-on-surface-variant text-[0.75rem] font-bold uppercase tracking-widest mb-2">本月支出总额</p>
-      <div class="flex items-baseline gap-1" data-page-hydration-gate>
+      <div class="flex items-baseline gap-1">
         <span class="text-on-surface-variant text-2xl font-light">¥</span>
-        <h2 class="font-headline text-[3.5rem] font-bold leading-none tracking-tight" data-page-hydration-gate id="statsMonthlySpend">0.00</h2>
+        <h2 class="font-headline text-[3.5rem] font-bold leading-none tracking-tight" id="statsMonthlySpend">0.00</h2>
       </div>
     </section>
     <div class="grid grid-cols-2 gap-4 mb-8">
-      <div class="col-span-2 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden" data-page-hydration-gate>
+      <div class="col-span-2 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden">
         <div class="relative w-48 h-48 flex items-center justify-center">
           <svg class="w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
             <circle cx="50" cy="50" fill="transparent" id="statsBaseArc" r="40" stroke="#262626" stroke-width="8"></circle>
@@ -131,14 +131,14 @@
           </div>
         </div>
       </div>
-      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square" data-page-hydration-gate>
+      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square">
         <span class="material-symbols-outlined text-primary-fixed text-3xl" data-icon="electric_car">electric_car</span>
         <div>
           <p class="text-on-surface-variant text-xs mb-1">平均每日</p>
           <p class="font-headline text-xl font-bold" id="statsDailyAverage">0.00</p>
         </div>
       </div>
-      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square" data-page-hydration-gate>
+      <div class="bg-surface-container rounded-lg p-6 flex flex-col justify-between aspect-square">
         <span class="material-symbols-outlined text-secondary text-3xl" data-icon="account_balance_wallet">account_balance_wallet</span>
         <div>
           <p class="text-on-surface-variant text-xs mb-1">上月对比</p>
@@ -151,7 +151,7 @@
         <h3 class="font-headline text-xl font-medium">分类明细</h3>
         <a class="text-secondary font-label text-[0.75rem] font-bold uppercase" href="./logs.html" id="statsViewAllLink">查看全部</a>
       </div>
-      <div class="space-y-2" data-page-hydration-gate>
+      <div class="space-y-2">
         <div class="flex items-center gap-5">
           <div class="w-12 h-12 rounded-full bg-primary-fixed/10 flex items-center justify-center">
             <span class="material-symbols-outlined text-primary-fixed" data-icon="local_gas_station">local_gas_station</span>
@@ -215,7 +215,7 @@
       </div>
     </section>
     <section class="page-footer-quote-card mt-8">
-      <div class="app-quote-card stats-quote-card bg-gradient-to-br from-surface-container to-surface-container-low rounded-xl p-8 border border-white/5 relative overflow-hidden group" data-runtime-copy-group>
+      <div class="app-quote-card stats-quote-card bg-gradient-to-br from-surface-container to-surface-container-low rounded-xl p-8 border border-white/5 relative overflow-hidden group">
         <div class="absolute -right-8 -bottom-8 opacity-10 group-hover:opacity-20 transition-opacity">
           <span class="material-symbols-outlined text-[120px]" data-icon="auto_awesome">auto_awesome</span>
         </div>
