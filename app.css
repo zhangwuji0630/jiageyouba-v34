@@ -73,18 +73,12 @@ body.app-page-leaving {
   pointer-events: none;
 }
 
-body.app-page-leaving::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: var(--app-bg);
-  z-index: 9999;
-}
-
 body.app-page-leaving .app-topbar,
 body.app-page-leaving .app-main,
 body.app-page-leaving .app-bottom-nav {
-  opacity: 0 !important;
+  opacity: 0.9 !important;
+  filter: blur(10px) saturate(0.92);
+  transform: scale(0.996);
 }
 
 [hidden] {
@@ -105,17 +99,34 @@ body.app-page-leaving .app-bottom-nav {
   border-bottom: 1px solid var(--app-line);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    opacity 90ms ease,
+    filter 90ms ease,
+    transform 120ms ease;
 }
 
 .app-bottom-nav {
   background: var(--app-nav) !important;
   box-shadow: var(--app-nav-shadow) !important;
   border-top: 1px solid var(--app-line);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    opacity 90ms ease,
+    filter 90ms ease,
+    transform 120ms ease;
 }
 
 .app-main {
   padding-top: calc(5rem + env(safe-area-inset-top)) !important;
   padding-bottom: calc(7.25rem + env(safe-area-inset-bottom)) !important;
+  transition:
+    opacity 90ms ease,
+    filter 90ms ease,
+    transform 120ms ease;
 }
 
 .app-page-hero {
