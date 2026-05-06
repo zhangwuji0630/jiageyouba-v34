@@ -1346,6 +1346,34 @@ function buildFuelEfficiencySeries(records) {
   return series;
 }
 
+function buildFuelIntervalMetrics(records) {
+  const ordered = getFuelRecords(records)
+    .filter((record) => record.odometerKm > 0 && record.amount > 0 && getFuelPayload(record).liters > 0)
+    .sort(compareRecordsByOdometer);
+  const metrics = new Map();
+
+  for (let index = 0; index < ordered.length - 1; index += 1) {
+    const record = ordered[index];
+    const nextRecord = ordered[index + 1];
+    const distanceKm = nextRecord.odometerKm - record.odometerKm;
+    if (distanceKm <= 0) {
+      continue;
+    }
+
+    const payload = getFuelPayload(record);
+    const litersPer100Km = (payload.liters * 100) / distanceKm;
+    const costPerKm = record.amount / distanceKm;
+
+    metrics.set(record.id, {
+      distanceKm,
+      litersPer100Km,
+      costPerKm,
+    });
+  }
+
+  return metrics;
+}
+
 function getDistanceCoverage(records) {
   const odometers = records.map((record) => record.odometerKm).filter((value) => value > 0);
   if (odometers.length < 2) {
@@ -1389,6 +1417,7 @@ function getVehicleAnalytics(snapshot, vehicleId) {
     currentFuelSeries,
     previousFuelSeries,
     efficiencyByRecordId: new Map(fuelSeries.map((item) => [item.recordId, item.litersPer100Km])),
+    fuelIntervalMetricsByRecordId: buildFuelIntervalMetrics(vehicleRecords),
   };
 }
 
@@ -1524,22 +1553,18 @@ function isDefaultGenericTitle(value) {
 }
 
 function getLatestFuelCostPerDistance(records, unitMode) {
-  const orderedFuelRecords = getFuelRecords(records)
-    .filter((record) => record.odometerKm > 0 && record.amount > 0)
-    .sort(compareRecordsByOdometer);
-  if (orderedFuelRecords.length < 2) {
+  const intervalMetricsByRecordId = buildFuelIntervalMetrics(records);
+  const orderedMetrics = getFuelRecords(records)
+    .filter((record) => record.odometerKm > 0)
+    .sort(compareRecordsByOdometer)
+    .map((record) => intervalMetricsByRecordId.get(record.id))
+    .filter(Boolean);
+  const latestMetrics = orderedMetrics[orderedMetrics.length - 1];
+  if (!latestMetrics) {
     return 0;
   }
 
-  const currentRecord = orderedFuelRecords[orderedFuelRecords.length - 1];
-  const previousRecord = orderedFuelRecords[orderedFuelRecords.length - 2];
-  const distanceKm = currentRecord.odometerKm - previousRecord.odometerKm;
-  if (distanceKm <= 0) {
-    return 0;
-  }
-
-  const scopedDistance = unitMode === "imperial" ? distanceKm * MILES_PER_KM : distanceKm;
-  return scopedDistance > 0 ? previousRecord.amount / scopedDistance : 0;
+  return unitMode === "imperial" ? latestMetrics.costPerKm / MILES_PER_KM : latestMetrics.costPerKm;
 }
 
 function getCostPerDistanceLabel(unitMode) {
@@ -2385,16 +2410,18 @@ function buildEmptyHistoryMarkup(kind = "") {
   `;
 }
 
-function getHistoryCardMetrics(record, efficiencyByRecordId, unitMode) {
+function getHistoryCardMetrics(record, analytics, unitMode) {
   if (record.kind === "fuel") {
-    const payload = getFuelPayload(record);
+    const intervalMetrics = analytics.fuelIntervalMetricsByRecordId.get(record.id);
     return {
       leftLabel: "油耗",
-      leftValue: formatDetailedEfficiency(efficiencyByRecordId.get(record.id) || 0, unitMode),
-      middleLabel: "当前里程",
-      middleValue: record.odometerKm > 0 ? `${formatDistanceValue(record.odometerKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
-      rightLabel: "加油量",
-      rightValue: `${formatNumber(payload.liters, 2)} L`,
+      leftValue: intervalMetrics ? formatDetailedEfficiency(intervalMetrics.litersPer100Km, unitMode) : "待下次加油",
+      middleLabel: "行驶里程",
+      middleValue: intervalMetrics ? `${formatDistanceValue(intervalMetrics.distanceKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
+      rightLabel: unitMode === "imperial" ? "每英里油费" : "每公里油费",
+      rightValue: intervalMetrics
+        ? `${formatNumber(unitMode === "imperial" ? intervalMetrics.costPerKm / MILES_PER_KM : intervalMetrics.costPerKm, 2)} ${unitMode === "imperial" ? "CNY/MI" : "CNY/KM"}`
+        : "--",
     };
   }
 
@@ -2464,7 +2491,7 @@ function renderHistoryList(snapshot) {
   list.innerHTML = scopedRecords
     .map((record) => {
       const vehicle = vehicleMap.get(record.vehicleId);
-      const metrics = getHistoryCardMetrics(record, analytics.efficiencyByRecordId, unitMode);
+      const metrics = getHistoryCardMetrics(record, analytics, unitMode);
       return `
         <div class="group">
           <div class="flex justify-between items-end mb-4">
