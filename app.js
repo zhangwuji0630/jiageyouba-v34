@@ -35,6 +35,7 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg
 const SUPABASE_REDIRECT_URL = "https://zhangwuji0630.github.io/jiageyouba-v34/settings.html";
 const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
 const SUPABASE_SDK_TIMEOUT_MS = 8000;
+const SUPABASE_SDK_INTERACTIVE_TIMEOUT_MS = 20000;
 const CLOUD_TABLE = "user_snapshots";
 const CLOUD_SYNC_DEBOUNCE_MS = 500;
 
@@ -1009,12 +1010,12 @@ function shouldPushLocalSnapshot(localSnapshot, remoteEnvelope, userId) {
   return localUpdatedAt > remoteUpdatedAt;
 }
 
-async function ensureSupabaseClient() {
+async function ensureSupabaseClient(options = {}) {
   if (cloudState.client) {
     return cloudState.client;
   }
 
-  await loadSupabaseSdk().catch((error) => {
+  await loadSupabaseSdk(options.timeoutMs).catch((error) => {
     console.error(error);
     return false;
   });
@@ -1087,8 +1088,19 @@ function loadSupabaseSdk(timeoutMs = SUPABASE_SDK_TIMEOUT_MS) {
       script.dataset.supabaseSdk = "true";
       script.async = true;
       script.src = SUPABASE_SDK_URL;
-      script.onload = () => resolve(typeof window.supabase?.createClient === "function");
-      script.onerror = () => reject(new Error("云同步组件加载失败"));
+      script.onload = () => {
+        if (typeof window.supabase?.createClient === "function") {
+          resolve(true);
+          return;
+        }
+        supabaseSdkPromise = null;
+        reject(new Error("云同步组件加载失败"));
+      };
+      script.onerror = () => {
+        supabaseSdkPromise = null;
+        script.remove();
+        reject(new Error("云同步组件加载失败"));
+      };
 
       if (!existingScript) {
         document.head.append(script);
@@ -1096,7 +1108,10 @@ function loadSupabaseSdk(timeoutMs = SUPABASE_SDK_TIMEOUT_MS) {
     });
   }
 
-  return withTimeout(supabaseSdkPromise, timeoutMs, "云同步组件加载超时");
+  return withTimeout(supabaseSdkPromise, timeoutMs, "云同步组件加载超时").catch((error) => {
+    supabaseSdkPromise = null;
+    throw error;
+  });
 }
 
 async function fetchRemoteSnapshotEnvelope(client) {
@@ -1247,7 +1262,7 @@ function scheduleCloudSync(reason, options = {}) {
 }
 
 async function syncCloudSnapshot(options = {}) {
-  const client = await ensureSupabaseClient().catch((error) => {
+  const client = await ensureSupabaseClient({ timeoutMs: options.timeoutMs }).catch((error) => {
     console.error(error);
     return null;
   });
@@ -3457,9 +3472,9 @@ async function initSettingsPage(snapshot) {
       return;
     }
 
-    const client = await ensureSupabaseClient();
+    const client = await ensureSupabaseClient({ timeoutMs: SUPABASE_SDK_INTERACTIVE_TIMEOUT_MS });
     if (!client) {
-      showToast("云同步组件加载失败，请刷新重试", "warning");
+      showToast("云同步组件加载失败，请稍后重试", "warning");
       return;
     }
 
@@ -3482,7 +3497,7 @@ async function initSettingsPage(snapshot) {
 
     if (data.session) {
       showToast("注册成功，正在同步数据");
-      await syncCloudSnapshot({ reason: "manual-signup" });
+      await syncCloudSnapshot({ reason: "manual-signup", timeoutMs: SUPABASE_SDK_INTERACTIVE_TIMEOUT_MS });
       renderSettingsPage(await loadSnapshot());
       return;
     }
@@ -3497,9 +3512,9 @@ async function initSettingsPage(snapshot) {
       return;
     }
 
-    const client = await ensureSupabaseClient();
+    const client = await ensureSupabaseClient({ timeoutMs: SUPABASE_SDK_INTERACTIVE_TIMEOUT_MS });
     if (!client) {
-      showToast("云同步组件加载失败，请刷新重试", "warning");
+      showToast("云同步组件加载失败，请稍后重试", "warning");
       return;
     }
 
@@ -3514,19 +3529,19 @@ async function initSettingsPage(snapshot) {
     }
 
     showToast("登录成功，正在同步数据");
-    const nextSnapshot = (await syncCloudSnapshot({ reason: "manual-signin", silent: true })) || (await loadSnapshot());
+    const nextSnapshot = (await syncCloudSnapshot({ reason: "manual-signin", silent: true, timeoutMs: SUPABASE_SDK_INTERACTIVE_TIMEOUT_MS })) || (await loadSnapshot());
     renderSettingsPage(nextSnapshot);
   });
 
   cloudSyncButton?.addEventListener("click", async () => {
-    const nextSnapshot = (await syncCloudSnapshot({ reason: "manual-sync", silent: false })) || (await loadSnapshot());
+    const nextSnapshot = (await syncCloudSnapshot({ reason: "manual-sync", silent: false, timeoutMs: SUPABASE_SDK_INTERACTIVE_TIMEOUT_MS })) || (await loadSnapshot());
     renderSettingsPage(nextSnapshot);
   });
 
   cloudSignOutButton?.addEventListener("click", async () => {
-    const client = await ensureSupabaseClient();
+    const client = await ensureSupabaseClient({ timeoutMs: SUPABASE_SDK_INTERACTIVE_TIMEOUT_MS });
     if (!client) {
-      showToast("云同步组件加载失败，请刷新重试", "warning");
+      showToast("云同步组件加载失败，请稍后重试", "warning");
       return;
     }
 

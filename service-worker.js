@@ -1,4 +1,4 @@
-const CACHE_NAME = "jiageyouba-v367-cache-v7";
+const CACHE_NAME = "jiageyouba-v367-cache-v8";
 const APP_SHELL = [
   "./",
   "./index.html",
