@@ -1523,9 +1523,23 @@ function isDefaultGenericTitle(value) {
   );
 }
 
-function getCostPerDistance(monthlySpend, monthlyDistanceKm, unitMode) {
-  const scopedDistance = unitMode === "imperial" ? monthlyDistanceKm * MILES_PER_KM : monthlyDistanceKm;
-  return scopedDistance > 0 ? monthlySpend / scopedDistance : 0;
+function getLatestFuelCostPerDistance(records, unitMode) {
+  const orderedFuelRecords = getFuelRecords(records)
+    .filter((record) => record.odometerKm > 0 && record.amount > 0)
+    .sort(compareRecordsByOdometer);
+  if (orderedFuelRecords.length < 2) {
+    return 0;
+  }
+
+  const currentRecord = orderedFuelRecords[orderedFuelRecords.length - 1];
+  const previousRecord = orderedFuelRecords[orderedFuelRecords.length - 2];
+  const distanceKm = currentRecord.odometerKm - previousRecord.odometerKm;
+  if (distanceKm <= 0) {
+    return 0;
+  }
+
+  const scopedDistance = unitMode === "imperial" ? distanceKm * MILES_PER_KM : distanceKm;
+  return scopedDistance > 0 ? previousRecord.amount / scopedDistance : 0;
 }
 
 function getCostPerDistanceLabel(unitMode) {
@@ -2321,7 +2335,7 @@ function renderDashboardPage(snapshot, options = {}) {
   const previousMonthlySpend = sumAmounts(analytics.previousMonthRecords);
   const monthlyDistance = getDistanceCoverage(analytics.currentMonthRecords);
   const monthlyAvgEfficiency = averageEfficiency(analytics.currentFuelSeries);
-  const costPerDistance = getCostPerDistance(monthlySpend, monthlyDistance, unitMode);
+  const latestFuelCostPerDistance = getLatestFuelCostPerDistance(analytics.allRecords, unitMode);
   const displayedMileage = unitMode === "imperial" ? monthlyDistance * MILES_PER_KM : monthlyDistance;
   const displayedEfficiency = monthlyAvgEfficiency > 0
     ? (unitMode === "imperial" ? 235.214583 / monthlyAvgEfficiency : monthlyAvgEfficiency)
@@ -2344,8 +2358,8 @@ function renderDashboardPage(snapshot, options = {}) {
     setText("dashboardAvgEfficiency", formatCompactEfficiency(monthlyAvgEfficiency, unitMode));
   }
   setText("dashboardCostPerDistanceLabel", getCostPerDistanceLabel(unitMode));
-  if (monthlyDistance > 0) {
-    animateNumberText("dashboardCostPerDistance", costPerDistance, { digits: 2, duration: immediate ? 0 : 600 });
+  if (latestFuelCostPerDistance > 0) {
+    animateNumberText("dashboardCostPerDistance", latestFuelCostPerDistance, { digits: 2, duration: immediate ? 0 : 600 });
   } else {
     setText("dashboardCostPerDistance", "--");
   }
