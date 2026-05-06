@@ -22,6 +22,8 @@ const ODOMETER_REQUIRED_KINDS = ["fuel", "maintenance"];
 const FUEL_TYPES = ["92#", "95#", "98#"];
 const MILES_PER_KM = 0.621371;
 const DONUT_CIRCUMFERENCE = 251.2;
+const MIN_REASONABLE_FUEL_EFFICIENCY = 1;
+const MAX_REASONABLE_FUEL_EFFICIENCY = 20;
 const THEME_STORAGE_KEY = "jiageyouba:v35:theme";
 const PAGE_VISIT_STORAGE_KEY = `${THEME_STORAGE_KEY}:page-visit`;
 const THEME_ORDER = ["dark", "light", "system"];
@@ -1294,6 +1296,10 @@ function getFuelPayload(record) {
   return normalizeFuelPayload(record.payload || {});
 }
 
+function isReasonableFuelEfficiency(litersPer100Km) {
+  return litersPer100Km >= MIN_REASONABLE_FUEL_EFFICIENCY && litersPer100Km <= MAX_REASONABLE_FUEL_EFFICIENCY;
+}
+
 function buildFuelEfficiencySeries(records) {
   const ordered = getFuelRecords(records)
     .filter((record) => record.odometerKm > 0 && getFuelPayload(record).liters > 0)
@@ -1330,7 +1336,7 @@ function buildFuelEfficiencySeries(records) {
     const distanceKm = record.odometerKm - anchor.odometerKm;
     const litersPer100Km = distanceKm > 0 ? (litersSinceAnchor * 100) / distanceKm : 0;
 
-    if (litersPer100Km > 1 && litersPer100Km < 30) {
+    if (isReasonableFuelEfficiency(litersPer100Km)) {
       series.push({
         recordId: record.id,
         date: record.date,
@@ -1355,13 +1361,22 @@ function buildFuelIntervalMetrics(records) {
   for (let index = 0; index < ordered.length - 1; index += 1) {
     const record = ordered[index];
     const nextRecord = ordered[index + 1];
+    const payload = getFuelPayload(record);
+    const nextPayload = getFuelPayload(nextRecord);
+    if (!payload.isFullTank || !nextPayload.isFullTank) {
+      continue;
+    }
+
     const distanceKm = nextRecord.odometerKm - record.odometerKm;
     if (distanceKm <= 0) {
       continue;
     }
 
-    const payload = getFuelPayload(record);
     const litersPer100Km = (payload.liters * 100) / distanceKm;
+    if (!isReasonableFuelEfficiency(litersPer100Km)) {
+      continue;
+    }
+
     const costPerKm = record.amount / distanceKm;
 
     metrics.set(record.id, {
@@ -2415,7 +2430,7 @@ function getHistoryCardMetrics(record, analytics, unitMode) {
     const intervalMetrics = analytics.fuelIntervalMetricsByRecordId.get(record.id);
     return {
       leftLabel: "油耗",
-      leftValue: intervalMetrics ? formatDetailedEfficiency(intervalMetrics.litersPer100Km, unitMode) : "待下次加油",
+      leftValue: intervalMetrics ? formatDetailedEfficiency(intervalMetrics.litersPer100Km, unitMode) : "待下次满油",
       middleLabel: "行驶里程",
       middleValue: intervalMetrics ? `${formatDistanceValue(intervalMetrics.distanceKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
       rightLabel: unitMode === "imperial" ? "每英里油费" : "每公里油费",
