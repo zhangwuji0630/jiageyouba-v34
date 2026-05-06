@@ -31,6 +31,8 @@ const DASHBOARD_FAST_RETURN_WINDOW_MS = 4500;
 const SUPABASE_URL = "https://akjryomhmjdttxnevzxz.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_9KnhgQT7Mzh5nMZMrCiSjg_pY0lEMgg";
 const SUPABASE_REDIRECT_URL = "https://zhangwuji0630.github.io/jiageyouba-v34/settings.html";
+const SUPABASE_SDK_URL = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+const SUPABASE_SDK_TIMEOUT_MS = 8000;
 const CLOUD_TABLE = "user_snapshots";
 const CLOUD_SYNC_DEBOUNCE_MS = 500;
 
@@ -214,6 +216,7 @@ const FLASH_MESSAGES = Object.freeze({
 });
 
 let databasePromise = null;
+let supabaseSdkPromise = null;
 let toastTimer = 0;
 let systemThemeWatcherBound = false;
 let cloudSyncTimer = 0;
@@ -950,6 +953,11 @@ async function ensureSupabaseClient() {
     return cloudState.client;
   }
 
+  await loadSupabaseSdk().catch((error) => {
+    console.error(error);
+    return false;
+  });
+
   if (typeof window === "undefined" || typeof window.supabase?.createClient !== "function") {
     return null;
   }
@@ -986,6 +994,48 @@ async function ensureSupabaseClient() {
   cloudState.session = data.session || null;
   cloudState.user = data.session?.user || null;
   return cloudState.client;
+}
+
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return promise;
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    promise
+      .then(resolve, reject)
+      .finally(() => window.clearTimeout(timer));
+  });
+}
+
+function loadSupabaseSdk(timeoutMs = SUPABASE_SDK_TIMEOUT_MS) {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return Promise.resolve(false);
+  }
+
+  if (typeof window.supabase?.createClient === "function") {
+    return Promise.resolve(true);
+  }
+
+  if (!supabaseSdkPromise) {
+    supabaseSdkPromise = new Promise((resolve, reject) => {
+      const existingScript = document.querySelector('script[data-supabase-sdk="true"]');
+      const script = existingScript || document.createElement("script");
+
+      script.dataset.supabaseSdk = "true";
+      script.async = true;
+      script.src = SUPABASE_SDK_URL;
+      script.onload = () => resolve(typeof window.supabase?.createClient === "function");
+      script.onerror = () => reject(new Error("云同步组件加载失败"));
+
+      if (!existingScript) {
+        document.head.append(script);
+      }
+    });
+  }
+
+  return withTimeout(supabaseSdkPromise, timeoutMs, "云同步组件加载超时");
 }
 
 async function fetchRemoteSnapshotEnvelope(client) {
@@ -3387,34 +3437,20 @@ async function initSettingsPage(snapshot) {
   });
 }
 
-async function initPage() {
-  applyTheme(readCachedThemeMode());
-  bindSystemThemeWatcher();
-  registerServiceWorker();
-  const pageName = document.body.dataset.page || "";
-  const skipDashboardEntranceMotion = pageName === "dashboard" && shouldSkipDashboardEntranceMotion();
-  await bootstrapDatabase();
-  await ensureSupabaseClient().catch((error) => {
-    console.error(error);
-  });
-  bindThemeEntryPoints();
-  showFlash();
-
-  let snapshot = await loadSnapshot();
-  if (cloudState.user) {
-    snapshot = (await syncCloudSnapshot({ reason: "startup-sync", silent: true })) || snapshot;
-  }
-  applyTheme(snapshot.settings.theme);
-
+async function renderCurrentPage(pageName, snapshot, options = {}) {
   switch (pageName) {
     case "dashboard":
       renderDashboardPage(snapshot, {
-        immediateMotion: skipDashboardEntranceMotion,
+        immediateMotion: options.immediateMotion === true,
       });
-      renderDashboardStoryQuote();
+      if (options.renderStatic !== false) {
+        renderDashboardStoryQuote();
+      }
       break;
     case "add":
-      await initAddPage(snapshot);
+      if (!options.refreshAfterSync) {
+        await initAddPage(snapshot);
+      }
       break;
     case "stats":
       renderStatsPage(snapshot);
@@ -3423,14 +3459,65 @@ async function initPage() {
       renderHistoryList(snapshot);
       break;
     case "settings":
-      await initSettingsPage(snapshot);
+      if (options.refreshAfterSync) {
+        renderSettingsPage(snapshot);
+      } else {
+        await initSettingsPage(snapshot);
+      }
       break;
     default:
       break;
   }
+}
+
+function syncCloudInBackground(pageName) {
+  void syncCloudSnapshot({ reason: "startup-sync", silent: true })
+    .then(async (syncedSnapshot) => {
+      if (!syncedSnapshot) {
+        return;
+      }
+      applyTheme(syncedSnapshot.settings.theme);
+      await renderCurrentPage(pageName, syncedSnapshot, {
+        immediateMotion: true,
+        refreshAfterSync: true,
+        renderStatic: false,
+      });
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}
+
+async function initPage() {
+  applyTheme(readCachedThemeMode());
+  bindSystemThemeWatcher();
+  registerServiceWorker();
+  const pageName = document.body.dataset.page || "";
+  const skipDashboardEntranceMotion = pageName === "dashboard" && shouldSkipDashboardEntranceMotion();
+  await bootstrapDatabase();
+  void ensureSupabaseClient()
+    .then(() => {
+      if (cloudState.user) {
+        syncCloudInBackground(pageName);
+        return;
+      }
+      void renderCloudAuthState().catch((error) => {
+        console.error(error);
+      });
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+  bindThemeEntryPoints();
+  showFlash();
+
+  const snapshot = await loadSnapshot();
+  applyTheme(snapshot.settings.theme);
+  await renderCurrentPage(pageName, snapshot, {
+    immediateMotion: skipDashboardEntranceMotion,
+  });
 
   renderFooterQuote(pageName);
-  await renderCloudAuthState(snapshot);
   rememberCurrentPageVisit();
 }
 
