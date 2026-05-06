@@ -2374,18 +2374,18 @@ function renderDashboardPage(snapshot, options = {}) {
   const monthlySpend = sumAmounts(analytics.currentMonthRecords);
   const previousMonthlySpend = sumAmounts(analytics.previousMonthRecords);
   const monthlyDistance = getDistanceCoverage(analytics.currentMonthRecords);
-  const monthlyAvgEfficiency = averageEfficiency(analytics.currentFuelSeries);
+  const lifetimeAvgEfficiency = averageEfficiency(analytics.fuelSeries);
   const latestFuelCostPerDistance = getLatestFuelCostPerDistance(analytics.allRecords, unitMode);
   const displayedMileage = unitMode === "imperial" ? monthlyDistance * MILES_PER_KM : monthlyDistance;
-  const displayedEfficiency = monthlyAvgEfficiency > 0
-    ? (unitMode === "imperial" ? 235.214583 / monthlyAvgEfficiency : monthlyAvgEfficiency)
+  const displayedEfficiency = lifetimeAvgEfficiency > 0
+    ? (unitMode === "imperial" ? 235.214583 / lifetimeAvgEfficiency : lifetimeAvgEfficiency)
     : 0;
 
   animateNumberText("dashboardMonthlySpend", monthlySpend, { digits: 2, duration: immediate ? 0 : 620 });
   setText("dashboardMonthlyDelta", getMonthDeltaLabel(monthlySpend, previousMonthlySpend));
   animateNumberText("dashboardMonthlyMileage", displayedMileage, { digits: 0, duration: immediate ? 0 : 560 });
   setText("dashboardMileageUnit", formatDistanceUnit(unitMode));
-  if (monthlyAvgEfficiency > 0) {
+  if (lifetimeAvgEfficiency > 0) {
     animateNumberText("dashboardAvgEfficiency", displayedEfficiency, {
       digits: 1,
       duration: immediate ? 0 : 580,
@@ -2395,7 +2395,7 @@ function renderDashboardPage(snapshot, options = {}) {
           : `${formatNumber(value, 1)} L/100`,
     });
   } else {
-    setText("dashboardAvgEfficiency", formatCompactEfficiency(monthlyAvgEfficiency, unitMode));
+    setText("dashboardAvgEfficiency", formatCompactEfficiency(lifetimeAvgEfficiency, unitMode));
   }
   setText("dashboardCostPerDistanceLabel", getCostPerDistanceLabel(unitMode));
   if (latestFuelCostPerDistance > 0) {
