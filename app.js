@@ -1422,30 +1422,34 @@ function buildFuelIntervalMetrics(records) {
     const nextRecord = ordered[index + 1];
     const payload = getFuelPayload(record);
     const nextPayload = getFuelPayload(nextRecord);
-    if (!payload.isFullTank || !nextPayload.isFullTank) {
-      continue;
-    }
-
     const distanceKm = nextRecord.odometerKm - record.odometerKm;
     if (distanceKm <= 0) {
       continue;
     }
 
     const litersPer100Km = (payload.liters * 100) / distanceKm;
-    if (!isReasonableFuelEfficiency(litersPer100Km)) {
-      continue;
-    }
-
     const costPerKm = record.amount / distanceKm;
 
     metrics.set(record.id, {
       distanceKm,
       litersPer100Km,
       costPerKm,
+      isEstimated: !payload.isFullTank || !nextPayload.isFullTank,
     });
   }
 
   return metrics;
+}
+
+function averageFuelIntervalEfficiency(metricsByRecordId) {
+  const metrics = [...metricsByRecordId.values()];
+  const totalDistanceKm = metrics.reduce((sum, item) => sum + item.distanceKm, 0);
+  if (totalDistanceKm <= 0) {
+    return 0;
+  }
+
+  const totalLiters = metrics.reduce((sum, item) => sum + (item.litersPer100Km * item.distanceKm) / 100, 0);
+  return (totalLiters * 100) / totalDistanceKm;
 }
 
 function getDistanceCoverage(records) {
@@ -2433,7 +2437,7 @@ function renderDashboardPage(snapshot, options = {}) {
   const monthlySpend = sumAmounts(analytics.currentMonthRecords);
   const previousMonthlySpend = sumAmounts(analytics.previousMonthRecords);
   const monthlyDistance = getDistanceCoverage(analytics.currentMonthRecords);
-  const lifetimeAvgEfficiency = averageEfficiency(analytics.fuelSeries);
+  const lifetimeAvgEfficiency = averageFuelIntervalEfficiency(analytics.fuelIntervalMetricsByRecordId);
   const latestFuelCostPerDistance = getLatestFuelCostPerDistance(analytics.allRecords, unitMode);
   const displayedMileage = unitMode === "imperial" ? monthlyDistance * MILES_PER_KM : monthlyDistance;
   const displayedEfficiency = lifetimeAvgEfficiency > 0
@@ -2488,8 +2492,8 @@ function getHistoryCardMetrics(record, analytics, unitMode) {
   if (record.kind === "fuel") {
     const intervalMetrics = analytics.fuelIntervalMetricsByRecordId.get(record.id);
     return {
-      leftLabel: "油耗",
-      leftValue: intervalMetrics ? formatDetailedEfficiency(intervalMetrics.litersPer100Km, unitMode) : "待下次满油",
+      leftLabel: intervalMetrics?.isEstimated ? "估算油耗" : "油耗",
+      leftValue: intervalMetrics ? formatDetailedEfficiency(intervalMetrics.litersPer100Km, unitMode) : "待下次加油",
       middleLabel: "行驶里程",
       middleValue: intervalMetrics ? `${formatDistanceValue(intervalMetrics.distanceKm, unitMode, 0)} ${unitMode === "imperial" ? "MI" : "KM"}` : "--",
       rightLabel: unitMode === "imperial" ? "每英里油费" : "每公里油费",
