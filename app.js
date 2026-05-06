@@ -1522,7 +1522,7 @@ function formatCompactEfficiency(litersPer100Km, unitMode) {
     return `${formatNumber(235.214583 / litersPer100Km, 1)} MPG`;
   }
 
-  return `${formatNumber(litersPer100Km, 1)} L/100`;
+  return `${formatNumber(litersPer100Km, 1)}L`;
 }
 
 function formatDetailedEfficiency(litersPer100Km, unitMode) {
@@ -1534,7 +1534,7 @@ function formatDetailedEfficiency(litersPer100Km, unitMode) {
     return `${formatNumber(235.214583 / litersPer100Km, 1)} MPG`;
   }
 
-  return `${formatNumber(litersPer100Km, 1)} L/100KM`;
+  return `${formatNumber(litersPer100Km, 1)}L`;
 }
 
 function getMonthDeltaLabel(currentValue, previousValue) {
@@ -2451,7 +2451,7 @@ function renderDashboardPage(snapshot, options = {}) {
       formatter: (value) =>
         unitMode === "imperial"
           ? `${formatNumber(value, 1)} MPG`
-          : `${formatNumber(value, 1)} L/100`,
+          : `${formatNumber(value, 1)}L`,
     });
   } else {
     setText("dashboardAvgEfficiency", formatCompactEfficiency(lifetimeAvgEfficiency, unitMode));
